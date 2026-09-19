@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: tradeazy-backend
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/tradeazy_db?useSSL=false&serverTimezone=Africa/Lagos&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:tradeazy_user}
+    password: ${DB_PASSWORD:TradeazyDev@123}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:change-me-in-prod-please-use-a-long-random-string-at-least-64-chars-abcdefghijklmnop}
+  expiration-ms: 86400000  # 24 hours
+
+tradeazy:
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
+  cors:
+    allowed-origins: http://localhost:5173
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.springframework.security: DEBUG
