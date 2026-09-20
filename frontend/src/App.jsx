@@ -1,39 +1,58 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import Navbar from "./components/layout/Navbar";
+import Login from "./pages/public/Login";
+import Register from "./pages/public/Register";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+function Home() {
+  const { user, isAuthenticated, loading } = useAuth();
 
-export default function App() {
-  const [status, setStatus] = useState("checking...");
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    axios.get(`${API_BASE}/health`)
-      .then(res => setStatus(res.data.status))
-      .catch(err => setError(err.message));
-  }, []);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-maroon-200 border-t-maroon-700" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <div className="text-center space-y-4">
-        <h1 className="text-5xl font-extrabold text-maroon-700">Tradeazy</h1>
-        <p className="text-gray-600">Your marketplace, made easy.</p>
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-white">
+      <div className="text-center space-y-4 px-6">
+        <h1 className="text-6xl font-extrabold text-maroon-700">Tradeazy</h1>
+        <p className="text-gray-600 text-lg">Your marketplace, made easy.</p>
 
-        <div className="mt-8 p-6 rounded-xl border border-gray-200 shadow-sm w-80">
-          <p className="text-sm text-gray-500 mb-2">Backend status</p>
-          {error ? (
-            <p className="text-red-600 font-mono text-sm">❌ {error}</p>
-          ) : (
-            <p className={`font-mono text-lg ${status === "UP" ? "text-green-600" : "text-yellow-600"}`}>
-              {status === "UP" ? "✅ API is UP" : `⏳ ${status}`}
+        {isAuthenticated ? (
+          <div className="mt-8 p-6 rounded-xl border border-gray-200 shadow-sm inline-block">
+            <p className="text-sm text-gray-500 mb-1">Logged in as</p>
+            <p className="font-semibold text-gray-800">
+              {user.firstName} {user.lastName}
             </p>
-          )}
-        </div>
-
-        <button className="mt-6 px-6 py-2 bg-maroon-700 hover:bg-maroon-800 text-white rounded-lg transition">
-          Phase 0 Complete 🎉
-        </button>
+            <p className="text-xs text-maroon-700 font-mono mt-1">
+              {user.roles?.join(", ")}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-8 text-sm text-gray-500">
+            Please log in or create an account to continue.
+          </p>
+        )}
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

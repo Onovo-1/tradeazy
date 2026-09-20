@@ -26,7 +26,7 @@ server:
   port: 8080
 
 jwt:
-  secret: ${JWT_SECRET:change-me-in-prod-please-use-a-long-random-string-at-least-64-chars-abcdefghijklmnop}
+  secret: ${JWT_SECRET:hF3j9aBd7KzXq2YvB1nM8sLpQ4tR6wE9cU0iO5pA3dS7fG2hJ4kL8mN1bV0xC6zW9qY2rT5uI8oP3aS6dF9gH0jK4lM7nB2vC5xZ8}
   expiration-ms: 86400000  # 24 hours
 
 tradeazy:
@@ -34,6 +34,14 @@ tradeazy:
     dir: ${UPLOAD_DIR:./uploads}
   cors:
     allowed-origins: http://localhost:5173
+  seed:
+    admin:
+      username: ${ADMIN_USERNAME:superadmin}
+      email: ${ADMIN_EMAIL:admin@tradeazy.test}
+      phone: ${ADMIN_PHONE:+2348000000000}
+      password: ${ADMIN_PASSWORD:AdminPass123}
+      first-name: Tradeazy
+      last-name: Admin
 
 springdoc:
   swagger-ui:
