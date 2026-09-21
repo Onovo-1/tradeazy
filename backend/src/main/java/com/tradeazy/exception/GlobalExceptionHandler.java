@@ -140,6 +140,25 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(FileValidationException.class)
+public ResponseEntity<ApiErrorResponse> handleFileValidation(
+        FileValidationException ex, HttpServletRequest request
+) {
+    return build(HttpStatus.BAD_REQUEST, "FILE_VALIDATION_FAILED", ex.getMessage(), request, null);
+}
+@ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+public ResponseEntity<ApiErrorResponse> handleMaxUploadSize(
+        org.springframework.web.multipart.MaxUploadSizeExceededException ex, HttpServletRequest request
+) {
+    return build(
+            HttpStatus.PAYLOAD_TOO_LARGE,
+            "FILE_TOO_LARGE",
+            "Uploaded file exceeds the maximum allowed size",
+            request,
+            null
+    );
+}
+
     // ---------------------------------------------------------------
     // Helper — builds the standard error body
     // ---------------------------------------------------------------
