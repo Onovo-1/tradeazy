@@ -3,7 +3,7 @@ spring:
     name: tradeazy-backend
 
   datasource:
-    url: jdbc:mysql://localhost:3306/tradeazy_db?useSSL=false&serverTimezone=Africa/Lagos&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/tradeazy_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Africa/Lagos&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:tradeazy_user}
     password: ${DB_PASSWORD:TradeazyDev@123}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -15,7 +15,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.MySQLDialect
 
   servlet:
     multipart:
@@ -27,7 +26,7 @@ server:
 
 jwt:
   secret: ${JWT_SECRET:hF3j9aBd7KzXq2YvB1nM8sLpQ4tR6wE9cU0iO5pA3dS7fG2hJ4kL8mN1bV0xC6zW9qY2rT5uI8oP3aS6dF9gH0jK4lM7nB2vC5xZ8}
-  expiration-ms: 86400000  # 24 hours
+  expiration-ms: 86400000
 
 tradeazy:
   upload:
@@ -50,4 +49,3 @@ springdoc:
 logging:
   level:
     org.hibernate.SQL: DEBUG
-    org.springframework.security: DEBUG

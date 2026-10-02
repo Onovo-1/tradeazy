@@ -25,14 +25,20 @@ axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
-    if (status === 401) {
-      // Clear session and bounce to login. But only if not already there.
-      localStorage.removeItem("tradeazy_token");
-      localStorage.removeItem("tradeazy_user");
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
-    }
+    const url = error.config?.url;
+
+    // DEBUG: log every error so we can see what's failing
+    console.log("[API ERROR]", status, url, error.response?.data);
+
+    // TEMPORARILY DISABLED so we can debug without being logged out
+    // if (status === 401) {
+    //   localStorage.removeItem("tradeazy_token");
+    //   localStorage.removeItem("tradeazy_user");
+    //   if (window.location.pathname !== "/login") {
+    //     window.location.href = "/login";
+    //   }
+    // }
+
     return Promise.reject(error);
   }
 );
