@@ -23,7 +23,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.tradeazy.entity.enums.ProductCondition;
+import com.tradeazy.specification.ProductSpecification;
+import org.springframework.data.jpa.domain.Specification;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -202,6 +206,34 @@ public class ProductService {
         return ProductMapper.toResponse(product);
     }
 
+    /**
+ * Global search + filters.
+ * All filters optional — passing null skips that filter.
+ */
+@Transactional(readOnly = true)
+public PagedResponse<ProductSummaryResponse> search(
+        String q,
+        Long categoryId,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        String location,
+        ProductCondition condition,
+        int page,
+        int size,
+        String sortBy
+) {
+    Specification<Product> spec = Specification
+            .where(ProductSpecification.isActive())
+            .and(ProductSpecification.matchesKeyword(q))
+            .and(ProductSpecification.inCategory(categoryId))
+            .and(ProductSpecification.priceBetween(minPrice, maxPrice))
+            .and(ProductSpecification.locationMatches(location))
+            .and(ProductSpecification.hasCondition(condition));
+
+    Pageable pageable = buildPageable(page, size, sortBy);
+    Page<Product> results = productRepository.findAll(spec, pageable);
+    return toPagedResponse(results);
+}
     /**
      * Seller's own product detail — any status is visible to the owner.
      */

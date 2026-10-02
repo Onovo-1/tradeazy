@@ -10,14 +10,32 @@ export default function Navbar() {
     navigate("/login");
   };
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const q = e.target.q.value.trim();
+    navigate(q ? `/browse?q=${encodeURIComponent(q)}` : "/browse");
+  };
+
   return (
     <nav className="bg-maroon-900 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="text-2xl font-extrabold tracking-tight">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
+        {/* Logo */}
+        <Link to="/" className="text-2xl font-extrabold tracking-tight shrink-0">
           Tradeazy
         </Link>
 
-        <div className="flex items-center gap-4 text-sm">
+        {/* Search bar */}
+        <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md">
+          <input
+            name="q"
+            type="text"
+            placeholder="Search products..."
+            className="w-full px-3 py-1.5 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-maroon-400"
+          />
+        </form>
+
+        {/* Right side — auth links */}
+        <div className="flex items-center gap-4 text-sm ml-auto shrink-0">
           {!isAuthenticated ? (
             <>
               <Link to="/login" className="hover:text-maroon-200 transition">
@@ -32,8 +50,11 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <span className="text-maroon-200">
-                Hi, <span className="font-semibold text-white">{user?.firstName}</span>
+              <span className="text-maroon-200 hidden sm:inline">
+                Hi,{" "}
+                <span className="font-semibold text-white">
+                  {user?.firstName}
+                </span>
               </span>
               {user?.roles?.includes("ADMIN") && (
                 <Link to="/admin" className="hover:text-maroon-200 transition">

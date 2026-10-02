@@ -56,7 +56,7 @@ public class Product {
     private Integer quantity = 1;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "`condition`", nullable = false, length = 20)
     private ProductCondition condition;
 
     @Column(nullable = false, length = 120)

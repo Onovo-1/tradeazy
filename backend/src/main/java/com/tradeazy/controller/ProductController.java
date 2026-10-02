@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.tradeazy.entity.enums.ProductCondition;
+import java.math.BigDecimal;
 
 /**
  * Product REST API.
@@ -39,14 +41,22 @@ public class ProductController {
     // ============================================================
 
     @GetMapping
-    @Operation(summary = "List all active products (paginated, sortable)")
-    public ResponseEntity<PagedResponse<ProductSummaryResponse>> list(
-            @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "newest") String sort
-    ) {
-        return ResponseEntity.ok(productService.listActive(page, size, sort));
-    }
+@Operation(summary = "Search active products with optional filters")
+public ResponseEntity<PagedResponse<ProductSummaryResponse>> list(
+        @RequestParam(required = false) String q,
+        @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) BigDecimal minPrice,
+        @RequestParam(required = false) BigDecimal maxPrice,
+        @RequestParam(required = false) String location,
+        @RequestParam(required = false) ProductCondition condition,
+        @RequestParam(defaultValue = "0")  int page,
+        @RequestParam(defaultValue = "20") int size,
+        @RequestParam(defaultValue = "newest") String sort
+) {
+    return ResponseEntity.ok(
+            productService.search(q, categoryId, minPrice, maxPrice, location, condition, page, size, sort)
+    );
+}
 
     @GetMapping("/category/{slug}")
     @Operation(summary = "List active products in a category")

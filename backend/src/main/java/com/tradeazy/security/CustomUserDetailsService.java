@@ -26,11 +26,12 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
-        User user = userRepository.findByEmailOrUsername(identifier)
-                .orElseThrow(() ->
-                        new UsernameNotFoundException("User not found with identifier: " + identifier)
-                );
+    User user = userRepository.findByEmailOrUsername(identifier)
+            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + identifier));
 
-        return new CustomUserDetails(user);
-    }
+    // Force-initialize the lazy roles collection while the session is still open
+    user.getRoles().size();
+
+    return new CustomUserDetails(user);
+}
 }
