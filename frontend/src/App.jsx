@@ -6,6 +6,7 @@ import Register from "./pages/public/Register";
 import Home from "./pages/public/Home";
 import Browse from "./pages/public/Browse";
 import ProductDetails from "./pages/public/ProductDetails";
+import Favorites from "./pages/buyer/Favorites";
 import SellerLayout from "./components/layout/SellerLayout";
 import SellerDashboard from "./pages/seller/SellerDashboard";
 import MyProducts from "./pages/seller/MyProducts";
@@ -24,6 +25,16 @@ export default function App() {
           <Route path="/products/:id" element={<ProductDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+
+          {/* Buyer */}
+          <Route
+            path="/favorites"
+            element={
+              <ProtectedRoute>
+                <Favorites />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Seller */}
           <Route

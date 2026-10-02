@@ -10,17 +10,6 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A product listing created by a SELLER.
- *
- * Design notes:
- *   - price is BigDecimal, NOT double — currency needs exact precision
- *   - discountPercent is optional; 0 means no discount
- *   - specifications is a free-form TEXT field (JSON-as-String for simplicity)
- *   - images are stored in a separate table with a @OneToMany relationship
- *   - viewCount and favoriteCount are denormalized counters kept in sync by services
- *     (denormalized = faster reads; we accept small risk of drift)
- */
 @Entity
 @Table(
     name = "products",
@@ -82,8 +71,6 @@ public class Product {
     @Builder.Default
     private Long favoriteCount = 0L;
 
-    // ----- Relationships -----
-
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "seller_id", nullable = false)
     private User seller;
@@ -101,7 +88,9 @@ public class Product {
     @Builder.Default
     private List<ProductImage> images = new ArrayList<>();
 
-    // ----- Timestamps -----
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Favorite> favorites = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -126,12 +115,6 @@ public class Product {
         this.updatedAt = OffsetDateTime.now();
     }
 
-    // ----- Helpers -----
-
-    /**
-     * Add an image to this product and set the back-reference.
-     * Call this instead of product.getImages().add(img) — it keeps both sides in sync.
-     */
     public void addImage(ProductImage image) {
         images.add(image);
         image.setProduct(this);
@@ -142,9 +125,6 @@ public class Product {
         image.setProduct(null);
     }
 
-    /**
-     * Effective price after discount. Rounded to 2 decimal places.
-     */
     public BigDecimal getEffectivePrice() {
         if (discountPercent == null || discountPercent <= 0) return price;
         BigDecimal discount = price
@@ -152,8 +132,6 @@ public class Product {
                 .divide(BigDecimal.valueOf(100));
         return price.subtract(discount).setScale(2, java.math.RoundingMode.HALF_UP);
     }
-
-    // ----- equals / hashCode -----
 
     @Override
     public boolean equals(Object o) {

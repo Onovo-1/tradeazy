@@ -1,11 +1,67 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { formatNaira, formatRelativeTime } from "../../utils/formatters";
+import { favoriteApi } from "../../api/favoriteApi";
+import { useAuth } from "../../context/AuthContext";
 
 const API_ROOT = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api"
 ).replace(/\/api$/, "");
 
 export default function ProductCard({ product }) {
+  const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
+
+  const [favorited, setFavorited] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const isOwnProduct =
+    user?.id && product.sellerId && user.id === product.sellerId;
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setFavorited(false);
+      return;
+    }
+    let cancelled = false;
+    favoriteApi
+      .check(product.id)
+      .then((r) => {
+        if (!cancelled) setFavorited(r.favorited);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, product.id]);
+
+  const handleFavorite = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    if (isOwnProduct) return;
+    if (busy) return;
+
+    setBusy(true);
+    try {
+      if (favorited) {
+        await favoriteApi.remove(product.id);
+        setFavorited(false);
+      } else {
+        await favoriteApi.add(product.id);
+        setFavorited(true);
+      }
+    } catch (err) {
+      // silently ignore
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const hasDiscount =
     product.discountPercent > 0 &&
     Number(product.effectivePrice) < Number(product.price);
@@ -19,7 +75,6 @@ export default function ProductCard({ product }) {
       to={`/products/${product.id}`}
       className="group block bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md hover:border-maroon-300 transition"
     >
-      {/* Image */}
       <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
         {imageUrl ? (
           <img
@@ -47,9 +102,28 @@ export default function ProductCard({ product }) {
             </span>
           </div>
         )}
+
+        {!isOwnProduct && (
+          <button
+            type="button"
+            onClick={handleFavorite}
+            disabled={busy}
+            aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+            className="absolute top-2 right-2 w-9 h-9 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-sm border border-gray-200 disabled:opacity-60 transition"
+          >
+            <span
+              className={
+                favorited
+                  ? "text-maroon-700 text-lg leading-none"
+                  : "text-gray-500 text-lg leading-none"
+              }
+            >
+              {favorited ? "♥" : "♡"}
+            </span>
+          </button>
+        )}
       </div>
 
-      {/* Body */}
       <div className="p-3">
         <h3 className="font-semibold text-gray-900 line-clamp-2 text-sm leading-tight mb-2 min-h-[2.5rem]">
           {product.name}

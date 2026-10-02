@@ -19,12 +19,10 @@ export default function Navbar() {
   return (
     <nav className="bg-maroon-900 text-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
-        {/* Logo */}
         <Link to="/" className="text-2xl font-extrabold tracking-tight shrink-0">
           Tradeazy
         </Link>
 
-        {/* Search bar */}
         <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md">
           <input
             name="q"
@@ -34,7 +32,6 @@ export default function Navbar() {
           />
         </form>
 
-        {/* Right side — auth links */}
         <div className="flex items-center gap-4 text-sm ml-auto shrink-0">
           {!isAuthenticated ? (
             <>
@@ -50,7 +47,13 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <span className="text-maroon-200 hidden sm:inline">
+              <Link
+                to="/favorites"
+                className="hover:text-maroon-200 transition hidden sm:inline"
+              >
+                Saved
+              </Link>
+              <span className="text-maroon-200 hidden md:inline">
                 Hi,{" "}
                 <span className="font-semibold text-white">
                   {user?.firstName}

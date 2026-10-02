@@ -1,23 +1,16 @@
 package com.tradeazy.entity;
 
+import com.tradeazy.entity.enums.RoleName;
 import com.tradeazy.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import com.tradeazy.entity.enums.RoleName;
 
-/**
- * A Tradeazy user.
- *
- * Every buyer, seller, and admin is a User. The distinguishing factor is which
- * Role(s) they hold — enforced at the security layer, not the DB layer.
- *
- * Note: This entity is NOT returned directly from controllers. We map it to
- * UserResponse DTOs to avoid leaking password hashes and to keep the API contract stable.
- */
 @Entity
 @Table(
     name = "users",
@@ -57,10 +50,6 @@ public class User {
     @Column(nullable = false, length = 20)
     private String phone;
 
-    /**
-     * BCrypt hash of the password. NEVER the plaintext.
-     * 60 characters is the standard BCrypt output length.
-     */
     @Column(nullable = false, length = 72)
     private String password;
 
@@ -88,13 +77,25 @@ public class User {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
+    /**
+     * Products listed by this user (only meaningful if user is a SELLER).
+     */
+    @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Product> products = new ArrayList<>();
+
+    /**
+     * Products this user has saved to favorites (buyer behavior).
+     */
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Favorite> favorites = new ArrayList<>();
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
-
-    // ---- Lifecycle hooks ----
 
     @PrePersist
     protected void onCreate() {
@@ -109,8 +110,6 @@ public class User {
         this.updatedAt = OffsetDateTime.now();
     }
 
-    // ---- Helper: add role without duplicates ----
-
     public void addRole(Role role) {
         this.roles.add(role);
     }
@@ -118,8 +117,6 @@ public class User {
     public boolean hasRole(RoleName roleName) {
         return this.roles.stream().anyMatch(r -> r.getName() == roleName);
     }
-
-    // ---- equals / hashCode based on id (JPA-safe) ----
 
     @Override
     public boolean equals(Object o) {
