@@ -1,23 +1,66 @@
 # Tradeazy 🛒
 
-A multi-vendor marketplace built with Spring Boot + React.
+A multi-vendor marketplace built with **Spring Boot + React + MySQL**.
 
-## Status
-- [x] Phase 0 — Foundation (backend + frontend + DB + CORS)
-- [ ] Phase 1 — Authentication & Roles
-- [ ] Phase 2 — Products & Categories
-- [ ] Phase 3 — Search & Filters
-- [ ] Phase 4 — Favorites
-- [ ] Phase 5 — Rent/Subscriptions
-- [ ] Phase 6 — Orders
-- [ ] Phase 7 — Chat
-- [ ] Phase 8 — Offers & Payment Plans
-- [ ] Phase 9 — Admin Dashboard
-- [ ] Phase 10 — Polish, Tests, Deploy Prep
+Tradeazy connects buyers and sellers. Sellers pay a monthly **Rent** subscription to list products. Buyers browse, save favorites, negotiate, and purchase via in-app chat.
 
-## Running Locally
+---
+
+## 📋 Project Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 0 | Foundation — Spring Boot, React, MySQL, CORS | ✅ Complete |
+| 1 | Authentication & Roles — JWT, register, login, protected routes | ✅ Complete |
+| 2 | Products & Categories — CRUD, images, seller dashboard | ✅ Complete |
+| 3 | Search & Filters | 🔜 Planned |
+| 4 | Favorites | 🔜 Planned |
+| 5 | Rent / Subscriptions | 🔜 Planned |
+| 6 | Orders | 🔜 Planned |
+| 7 | Chat | 🔜 Planned |
+| 8 | Offers & Payment Plans | 🔜 Planned |
+| 9 | Admin Dashboard | 🔜 Planned |
+| 10 | Polish, Tests, Deployment | 🔜 Planned |
+
+---
+
+## 🏗️ Tech Stack
 
 ### Backend
-```bash
-cd backend
-./mvnw spring-boot:run
+- **Java 21**
+- **Spring Boot 4.x**
+- Spring Web (REST APIs)
+- Spring Data JPA + Hibernate
+- Spring Security + JWT (jjwt)
+- MySQL 8
+- Maven
+- Lombok
+- Swagger / OpenAPI (springdoc)
+
+### Frontend
+- **React 18** with **Vite**
+- React Router v6
+- Axios
+- Tailwind CSS
+
+### Database
+- MySQL 8 (`tradeazy_db`)
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Java 21** (JDK)
+- **Maven** (or use the included `./mvnw`)
+- **Node.js 20+**
+- **MySQL 8**
+
+### 1. Database Setup
+
+```sql
+CREATE DATABASE tradeazy_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'tradeazy_user'@'localhost' IDENTIFIED BY 'TradeazyDev@123';
+GRANT ALL PRIVILEGES ON tradeazy_db.* TO 'tradeazy_user'@'localhost';
+FLUSH PRIVILEGES;
