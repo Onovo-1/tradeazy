@@ -1,12 +1,13 @@
 package com.tradeazy.service;
 
 import com.tradeazy.dto.request.ProductRequest;
+import com.tradeazy.dto.response.PagedResponse;
 import com.tradeazy.dto.response.ProductResponse;
 import com.tradeazy.dto.response.ProductSummaryResponse;
-import com.tradeazy.dto.response.PagedResponse;
 import com.tradeazy.entity.Category;
 import com.tradeazy.entity.Product;
 import com.tradeazy.entity.User;
+import com.tradeazy.entity.enums.ProductCondition;
 import com.tradeazy.entity.enums.ProductStatus;
 import com.tradeazy.exception.ForbiddenException;
 import com.tradeazy.exception.InvalidOperationException;
@@ -15,33 +16,20 @@ import com.tradeazy.mapper.ProductMapper;
 import com.tradeazy.repository.CategoryRepository;
 import com.tradeazy.repository.ProductRepository;
 import com.tradeazy.repository.UserRepository;
+import com.tradeazy.specification.ProductSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.tradeazy.entity.enums.ProductCondition;
-import com.tradeazy.specification.ProductSpecification;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-/**
- * Product business logic.
- *
- * Core business rules enforced here:
- *   1. Only SELLERs can create products (enforced at controller too).
- *   2. A seller must have an ACTIVE Rent subscription to CREATE new listings.
- *   3. Rent expiry does NOT delete existing products — they stay visible.
- *   4. Sellers can only edit/delete/mark-sold their OWN products.
- *   5. Buyers can only see ACTIVE products on the public marketplace.
- *   6. Marking SOLD is permanent (no un-sold) — admin must intervene to restore.
- *   7. DELETE is a soft-delete (status = REMOVED) so order history stays intact.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -50,7 +38,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
-    private final SubscriptionChecker subscriptionChecker;
+    private final SubscriptionService subscriptionService;
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
@@ -60,12 +48,7 @@ public class ProductService {
     // ============================================================
     @Transactional
     public ProductResponse create(ProductRequest request, Long sellerId) {
-
-        // 1. Seller must have an active Rent subscription.
-        //    Note: this is the business rule from the project spec.
-        //    Existing listings remain visible when Rent expires,
-        //    but the seller cannot create NEW ones.
-        if (!subscriptionChecker.hasActiveRent(sellerId)) {
+        if (!subscriptionService.hasActiveRent(sellerId)) {
             throw new InvalidOperationException(
                     "Your Rent subscription is not active. "
                     + "Renew your Rent to create new listings. "
@@ -73,7 +56,6 @@ public class ProductService {
             );
         }
 
-        // 2. Load seller + category
         User seller = userRepository.findById(sellerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Seller not found: " + sellerId));
 
@@ -82,7 +64,6 @@ public class ProductService {
                         "Category not found: " + request.getCategoryId()
                 ));
 
-        // 3. Build and save
         Product product = Product.builder()
                 .name(request.getName())
                 .description(request.getDescription())
@@ -102,17 +83,10 @@ public class ProductService {
         return ProductMapper.toResponse(saved);
     }
 
-    // ============================================================
-    // UPDATE — ownership enforced
-    // ============================================================
     @Transactional
     public ProductResponse update(Long productId, ProductRequest request, Long sellerId) {
-
-        // Ownership: only the seller who owns it can edit
         Product product = productRepository.findByIdAndSellerId(productId, sellerId)
-                .orElseThrow(() -> new ForbiddenException(
-                        "Product not found or you do not own it"
-                ));
+                .orElseThrow(() -> new ForbiddenException("Product not found or you do not own it"));
 
         if (product.getStatus() == ProductStatus.SOLD) {
             throw new InvalidOperationException("Cannot edit a product that has been sold");
@@ -141,9 +115,6 @@ public class ProductService {
         return ProductMapper.toResponse(saved);
     }
 
-    // ============================================================
-    // MARK AS SOLD
-    // ============================================================
     @Transactional
     public ProductResponse markAsSold(Long productId, Long sellerId) {
         Product product = productRepository.findByIdAndSellerId(productId, sellerId)
@@ -162,32 +133,18 @@ public class ProductService {
         return ProductMapper.toResponse(saved);
     }
 
-    // ============================================================
-    // SOFT DELETE
-    // ============================================================
     @Transactional
     public void delete(Long productId, Long sellerId) {
         Product product = productRepository.findByIdAndSellerId(productId, sellerId)
                 .orElseThrow(() -> new ForbiddenException("Product not found or you do not own it"));
 
-        if (product.getStatus() == ProductStatus.REMOVED) {
-            return; // idempotent
-        }
+        if (product.getStatus() == ProductStatus.REMOVED) return;
 
         product.setStatus(ProductStatus.REMOVED);
         productRepository.save(product);
         log.info("Product soft-deleted: id={}, sellerId={}", productId, sellerId);
     }
 
-    // ============================================================
-    // PUBLIC READS
-    // ============================================================
-
-    /**
-     * Public product detail. Only ACTIVE or SOLD products are visible —
-     * REMOVED products return 404. SOLD products stay visible for history.
-     * View count is incremented atomically.
-     */
     @Transactional
     public ProductResponse getPublicDetail(Long productId) {
         Product product = productRepository.findById(productId)
@@ -197,46 +154,11 @@ public class ProductService {
             throw new ResourceNotFoundException("Product not found: " + productId);
         }
 
-        // Atomic increment (doesn't touch the loaded entity)
         productRepository.incrementViewCount(productId);
-
-        // Update in-memory counter so response matches DB
         product.setViewCount(product.getViewCount() + 1);
-
         return ProductMapper.toResponse(product);
     }
 
-    /**
- * Global search + filters.
- * All filters optional — passing null skips that filter.
- */
-@Transactional(readOnly = true)
-public PagedResponse<ProductSummaryResponse> search(
-        String q,
-        Long categoryId,
-        BigDecimal minPrice,
-        BigDecimal maxPrice,
-        String location,
-        ProductCondition condition,
-        int page,
-        int size,
-        String sortBy
-) {
-    Specification<Product> spec = Specification
-            .where(ProductSpecification.isActive())
-            .and(ProductSpecification.matchesKeyword(q))
-            .and(ProductSpecification.inCategory(categoryId))
-            .and(ProductSpecification.priceBetween(minPrice, maxPrice))
-            .and(ProductSpecification.locationMatches(location))
-            .and(ProductSpecification.hasCondition(condition));
-
-    Pageable pageable = buildPageable(page, size, sortBy);
-    Page<Product> results = productRepository.findAll(spec, pageable);
-    return toPagedResponse(results);
-}
-    /**
-     * Seller's own product detail — any status is visible to the owner.
-     */
     @Transactional(readOnly = true)
     public ProductResponse getOwnedDetail(Long productId, Long sellerId) {
         Product product = productRepository.findByIdAndSellerId(productId, sellerId)
@@ -244,9 +166,6 @@ public PagedResponse<ProductSummaryResponse> search(
         return ProductMapper.toResponse(product);
     }
 
-    /**
-     * Public listing — ACTIVE products only, paginated.
-     */
     @Transactional(readOnly = true)
     public PagedResponse<ProductSummaryResponse> listActive(int page, int size, String sortBy) {
         Pageable pageable = buildPageable(page, size, sortBy);
@@ -254,9 +173,6 @@ public PagedResponse<ProductSummaryResponse> search(
         return toPagedResponse(products);
     }
 
-    /**
-     * Products in a category — public.
-     */
     @Transactional(readOnly = true)
     public PagedResponse<ProductSummaryResponse> listByCategory(String slug, int page, int size, String sortBy) {
         Category category = categoryRepository.findBySlug(slug)
@@ -267,10 +183,6 @@ public PagedResponse<ProductSummaryResponse> search(
         );
         return toPagedResponse(products);
     }
-
-    // ============================================================
-    // SELLER DASHBOARD
-    // ============================================================
 
     @Transactional(readOnly = true)
     public PagedResponse<ProductSummaryResponse> listMyProducts(Long sellerId, int page, int size, String sortBy) {
@@ -285,9 +197,36 @@ public PagedResponse<ProductSummaryResponse> search(
     }
 
     // ============================================================
+    // SEARCH — Phase 3
+    // ============================================================
+    @Transactional(readOnly = true)
+    public PagedResponse<ProductSummaryResponse> search(
+            String q,
+            Long categoryId,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String location,
+            ProductCondition condition,
+            int page,
+            int size,
+            String sortBy
+    ) {
+        Specification<Product> spec = Specification
+                .where(ProductSpecification.isActive())
+                .and(ProductSpecification.matchesKeyword(q))
+                .and(ProductSpecification.inCategory(categoryId))
+                .and(ProductSpecification.priceBetween(minPrice, maxPrice))
+                .and(ProductSpecification.locationMatches(location))
+                .and(ProductSpecification.hasCondition(condition));
+
+        Pageable pageable = buildPageable(page, size, sortBy);
+        Page<Product> results = productRepository.findAll(spec, pageable);
+        return toPagedResponse(results);
+    }
+
+    // ============================================================
     // HELPERS
     // ============================================================
-
     private Pageable buildPageable(int page, int size, String sortBy) {
         int safePage = Math.max(0, page);
         int safeSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
@@ -296,7 +235,7 @@ public PagedResponse<ProductSummaryResponse> search(
             case "price_asc"  -> Sort.by(Sort.Direction.ASC, "price");
             case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
             case "popular"    -> Sort.by(Sort.Direction.DESC, "viewCount");
-            default           -> Sort.by(Sort.Direction.DESC, "createdAt"); // newest
+            default           -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
 
         return PageRequest.of(safePage, safeSize, sort);

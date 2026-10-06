@@ -11,6 +11,7 @@ import SellerLayout from "./components/layout/SellerLayout";
 import SellerDashboard from "./pages/seller/SellerDashboard";
 import MyProducts from "./pages/seller/MyProducts";
 import AddProduct from "./pages/seller/AddProduct";
+import Rent from "./pages/seller/Rent";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
             <Route index element={<SellerDashboard />} />
             <Route path="products" element={<MyProducts />} />
             <Route path="products/new" element={<AddProduct />} />
+            <Route path="rent" element={<Rent />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

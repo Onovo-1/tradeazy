@@ -77,19 +77,17 @@ public class User {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
-    /**
-     * Products listed by this user (only meaningful if user is a SELLER).
-     */
     @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Product> products = new ArrayList<>();
 
-    /**
-     * Products this user has saved to favorites (buyer behavior).
-     */
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Favorite> favorites = new ArrayList<>();
+
+    @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Subscription> subscriptions = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

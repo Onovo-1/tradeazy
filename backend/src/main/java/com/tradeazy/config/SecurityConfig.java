@@ -45,6 +45,7 @@ public class SecurityConfig {
             "/api/categories",
             "/api/categories/*",
             "/api/users/*/public",
+            "/api/subscriptions/prices",
             "/uploads/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
@@ -93,6 +94,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                // Public prices endpoint FIRST — must beat the seller-only rule
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions/prices").permitAll()
+
                 // Seller dashboard
                 .requestMatchers("/api/products/mine").hasRole("SELLER")
                 .requestMatchers("/api/products/mine/**").hasRole("SELLER")
@@ -115,7 +119,6 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH,  "/api/products/**").hasRole("SELLER")
                 .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("SELLER")
 
-                // Everything else requires authentication (includes /api/favorites/**)
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
