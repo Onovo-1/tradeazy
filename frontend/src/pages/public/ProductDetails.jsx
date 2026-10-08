@@ -1,19 +1,27 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { productApi } from "../../api/productApi";
+import { favoriteApi } from "../../api/favoriteApi";
+import { chatApi } from "../../api/chatApi";
+import { useAuth } from "../../context/AuthContext";
 import ImageGallery from "../../components/product/ImageGallery";
 import { formatNaira, formatRelativeTime } from "../../utils/formatters";
 
 export default function ProductDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [favorited, setFavorited] = useState(false);
+  const [favBusy, setFavBusy] = useState(false);
+  const [chatStarting, setChatStarting] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       try {
         setLoading(true);
@@ -23,21 +31,75 @@ export default function ProductDetails() {
       } catch (err) {
         if (!cancelled) {
           const status = err.response?.status;
-          if (status === 404) {
-            setError("This product no longer exists or has been removed.");
-          } else {
-            setError(err.response?.data?.message || "Failed to load product.");
-          }
+          setError(
+            status === 404
+              ? "This product no longer exists or has been removed."
+              : err.response?.data?.message || "Failed to load product."
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !id) return;
+    let cancelled = false;
+    favoriteApi
+      .check(id)
+      .then((r) => {
+        if (!cancelled) setFavorited(r.favorited);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, id]);
+
+  const isOwnProduct =
+    user?.id && product?.seller?.id && user.id === product.seller.id;
+
+  const handleSave = async () => {
+    if (!isAuthenticated) return navigate("/login");
+    if (isOwnProduct) return alert("You cannot favorite your own product.");
+    if (favBusy) return;
+    setFavBusy(true);
+    try {
+      if (favorited) {
+        await favoriteApi.remove(product.id);
+        setFavorited(false);
+        setProduct((p) => ({ ...p, favoriteCount: Math.max(0, (p.favoriteCount ?? 1) - 1) }));
+      } else {
+        await favoriteApi.add(product.id);
+        setFavorited(true);
+        setProduct((p) => ({ ...p, favoriteCount: (p.favoriteCount ?? 0) + 1 }));
+      }
+    } catch (err) {
+      if (err.response?.status === 409) setFavorited(true);
+      else alert(err.response?.data?.message || "Something went wrong.");
+    } finally {
+      setFavBusy(false);
+    }
+  };
+
+  const handleChat = async () => {
+    if (!isAuthenticated) return navigate("/login");
+    if (isOwnProduct) return alert("You cannot chat with yourself.");
+    if (chatStarting) return;
+    setChatStarting(true);
+    try {
+      const conv = await chatApi.start(product.id);
+      navigate(`/messages/${conv.id}`);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to start conversation");
+    } finally {
+      setChatStarting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -52,10 +114,7 @@ export default function ProductDetails() {
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <p className="text-lg text-gray-700 mb-2">{error}</p>
-          <Link
-            to="/browse"
-            className="text-maroon-700 font-semibold hover:underline"
-          >
+          <Link to="/browse" className="text-maroon-700 font-semibold hover:underline">
             ← Back to browse
           </Link>
         </div>
@@ -170,21 +229,37 @@ export default function ProductDetails() {
             )}
 
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              <button
-                type="button"
-                disabled={isSold}
-                onClick={() => alert("Chat will be available in Phase 7 — coming soon!")}
-                className="flex-1 bg-maroon-700 hover:bg-maroon-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition"
-              >
-                💬 Chat with Seller
-              </button>
-              <button
-                type="button"
-                onClick={() => alert("Saved products arrive in Phase 4 — coming soon!")}
-                className="sm:w-32 border border-maroon-700 text-maroon-700 hover:bg-maroon-50 font-semibold py-3 rounded-lg transition"
-              >
-                ♡ Save
-              </button>
+              {!isOwnProduct && (
+                <button
+                  type="button"
+                  disabled={isSold || chatStarting}
+                  onClick={handleChat}
+                  className="flex-1 bg-maroon-700 hover:bg-maroon-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition"
+                >
+                  {chatStarting ? "Opening chat..." : "💬 Chat with Seller"}
+                </button>
+              )}
+
+              {!isOwnProduct && (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={favBusy}
+                  className={`sm:w-40 font-semibold py-3 rounded-lg transition border ${
+                    favorited
+                      ? "bg-maroon-700 text-white border-maroon-700 hover:bg-maroon-800"
+                      : "border-maroon-700 text-maroon-700 hover:bg-maroon-50"
+                  } disabled:opacity-60`}
+                >
+                  {favorited ? "♥ Saved" : "♡ Save"}
+                </button>
+              )}
+
+              {isOwnProduct && (
+                <div className="flex-1 text-sm text-gray-500 italic py-3">
+                  This is your listing.
+                </div>
+              )}
             </div>
 
             <div className="mb-6">

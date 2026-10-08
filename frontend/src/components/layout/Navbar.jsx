@@ -1,8 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useChat } from "../../context/ChatContext";
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
+  const { unreadCount } = useChat();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -47,6 +49,17 @@ export default function Navbar() {
             </>
           ) : (
             <>
+              <Link
+                to="/messages"
+                className="relative hover:text-maroon-200 transition hidden sm:inline"
+              >
+                Messages
+                {unreadCount > 0 && (
+                  <span className="absolute -top-2 -right-3 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </Link>
               <Link
                 to="/favorites"
                 className="hover:text-maroon-200 transition hidden sm:inline"

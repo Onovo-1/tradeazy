@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import PasswordInput from "../../components/common/PasswordInput";
 
 export default function Register() {
   const { register } = useAuth();
@@ -158,13 +159,12 @@ export default function Register() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Password
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 name="password"
                 value={form.password}
                 onChange={handleChange}
                 required
-                className={inputClass("password")}
+                autoComplete="new-password"
               />
               {fieldErrors.password && (
                 <p className="text-xs text-red-600 mt-1">{fieldErrors.password}</p>
@@ -174,13 +174,12 @@ export default function Register() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Confirm password
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 name="confirmPassword"
                 value={form.confirmPassword}
                 onChange={handleChange}
                 required
-                className={inputClass("confirmPassword")}
+                autoComplete="new-password"
               />
               {fieldErrors.confirmPassword && (
                 <p className="text-xs text-red-600 mt-1">

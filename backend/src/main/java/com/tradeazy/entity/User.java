@@ -89,6 +89,14 @@ public class User {
     @Builder.Default
     private List<Subscription> subscriptions = new ArrayList<>();
 
+    @OneToMany(mappedBy = "buyer", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Order> buyerOrders = new ArrayList<>();
+
+    @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Order> sellerOrders = new ArrayList<>();
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
