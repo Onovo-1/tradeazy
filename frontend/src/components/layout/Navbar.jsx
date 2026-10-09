@@ -68,6 +68,13 @@ export default function Navbar() {
                 )}
               </Link>
 
+              <Link
+                to="/orders"
+                className="hover:text-maroon-200 transition hidden sm:inline"
+              >
+                Orders
+              </Link>
+
               <span className="text-maroon-200 hidden md:inline">
                 Hi,{" "}
                 <span className="font-semibold text-white">

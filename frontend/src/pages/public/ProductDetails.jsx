@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { productApi } from "../../api/productApi";
 import { favoriteApi } from "../../api/favoriteApi";
 import { chatApi } from "../../api/chatApi";
+import { orderApi } from "../../api/orderApi";
 import { useAuth } from "../../context/AuthContext";
 import ImageGallery from "../../components/product/ImageGallery";
 import { formatNaira, formatRelativeTime } from "../../utils/formatters";
@@ -19,6 +20,7 @@ export default function ProductDetails() {
   const [favorited, setFavorited] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
+  const [buyBusy, setBuyBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +123,29 @@ export default function ProductDetails() {
       alert(err.response?.data?.message || "Could not start chat.");
     } finally {
       setChatBusy(false);
+    }
+  };
+
+  const handleBuy = async () => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    if (isOwnProduct) return;
+    if (!confirm(`Buy "${product.name}" for ${formatNaira(product.effectivePrice)}?`)) return;
+    if (buyBusy) return;
+
+    setBuyBusy(true);
+    try {
+      const order = await orderApi.create({
+        productId: product.id,
+        quantity: 1,
+      });
+      navigate(`/orders?new=${order.id}`);
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not create order.");
+    } finally {
+      setBuyBusy(false);
     }
   };
 
@@ -254,14 +279,29 @@ export default function ProductDetails() {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              {!isOwnProduct ? (
-                <>
+            {!isOwnProduct ? (
+              <div className="space-y-3 mb-6">
+                {/* Buy button — big, primary */}
+                <button
+                  type="button"
+                  disabled={isSold || buyBusy}
+                  onClick={handleBuy}
+                  className="w-full bg-maroon-700 hover:bg-maroon-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-lg transition text-base"
+                >
+                  {isSold
+                    ? "This item has been sold"
+                    : buyBusy
+                    ? "Creating order…"
+                    : `🛒 Buy Now — ${formatNaira(product.effectivePrice)}`}
+                </button>
+
+                {/* Secondary actions */}
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     type="button"
                     disabled={isSold || chatBusy}
                     onClick={handleChat}
-                    className="flex-1 bg-maroon-700 hover:bg-maroon-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition"
+                    className="flex-1 border border-maroon-700 text-maroon-700 hover:bg-maroon-50 disabled:opacity-50 font-semibold py-3 rounded-lg transition"
                   >
                     {chatBusy ? "Opening chat…" : "💬 Chat with Seller"}
                   </button>
@@ -278,13 +318,13 @@ export default function ProductDetails() {
                   >
                     {favorited ? "♥ Saved" : "♡ Save"}
                   </button>
-                </>
-              ) : (
-                <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 w-full">
-                  This is your listing.
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 w-full mb-6">
+                This is your listing.
+              </div>
+            )}
 
             <div className="mb-6">
               <h2 className="font-semibold text-gray-900 mb-2">Description</h2>

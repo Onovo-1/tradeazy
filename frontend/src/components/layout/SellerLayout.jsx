@@ -4,6 +4,7 @@ const navItems = [
   { to: "/seller", label: "Overview", end: true },
   { to: "/seller/products", label: "My Products" },
   { to: "/seller/products/new", label: "Add Product" },
+  { to: "/seller/orders", label: "Orders" },
   { to: "/seller/rent", label: "Rent" },
 ];
 
