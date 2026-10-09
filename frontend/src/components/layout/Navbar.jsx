@@ -1,11 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useChat } from "../../context/ChatContext";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
-  const { unreadCount } = useChat();
   const navigate = useNavigate();
+  const unread = useUnreadCount();
 
   const handleLogout = () => {
     logout();
@@ -37,7 +37,9 @@ export default function Navbar() {
         <div className="flex items-center gap-4 text-sm ml-auto shrink-0">
           {!isAuthenticated ? (
             <>
-              <Link to="/login" className="hover:text-maroon-200 transition">Login</Link>
+              <Link to="/login" className="hover:text-maroon-200 transition">
+                Login
+              </Link>
               <Link
                 to="/register"
                 className="bg-maroon-600 hover:bg-maroon-500 px-4 py-1.5 rounded-lg font-semibold transition"
@@ -48,37 +50,40 @@ export default function Navbar() {
           ) : (
             <>
               <Link
-                to="/messages"
-                className="relative hover:text-maroon-200 transition hidden sm:inline"
-              >
-                Messages
-                {unreadCount > 0 && (
-                  <span className="absolute -top-2 -right-3 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-              </Link>
-              <Link
-                to="/orders"
-                className="hover:text-maroon-200 transition hidden sm:inline"
-              >
-                Orders
-              </Link>
-              <Link
                 to="/favorites"
                 className="hover:text-maroon-200 transition hidden sm:inline"
               >
                 Saved
               </Link>
+
+              <Link
+                to="/messages"
+                className="relative hover:text-maroon-200 transition hidden sm:inline"
+              >
+                Messages
+                {unread > 0 && (
+                  <span className="absolute -top-1.5 -right-3 bg-red-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                    {unread}
+                  </span>
+                )}
+              </Link>
+
               <span className="text-maroon-200 hidden md:inline">
                 Hi,{" "}
-                <span className="font-semibold text-white">{user?.firstName}</span>
+                <span className="font-semibold text-white">
+                  {user?.firstName}
+                </span>
               </span>
+
               {user?.roles?.includes("ADMIN") && (
-                <Link to="/admin" className="hover:text-maroon-200 transition">Admin</Link>
+                <Link to="/admin" className="hover:text-maroon-200 transition">
+                  Admin
+                </Link>
               )}
               {user?.roles?.includes("SELLER") && (
-                <Link to="/seller" className="hover:text-maroon-200 transition">Seller</Link>
+                <Link to="/seller" className="hover:text-maroon-200 transition">
+                  Seller
+                </Link>
               )}
               <button
                 onClick={handleLogout}

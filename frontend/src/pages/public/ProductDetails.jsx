@@ -5,7 +5,6 @@ import { favoriteApi } from "../../api/favoriteApi";
 import { chatApi } from "../../api/chatApi";
 import { useAuth } from "../../context/AuthContext";
 import ImageGallery from "../../components/product/ImageGallery";
-import BuyOrderModal from "../../components/order/BuyOrderModal";
 import { formatNaira, formatRelativeTime } from "../../utils/formatters";
 
 export default function ProductDetails() {
@@ -19,11 +18,11 @@ export default function ProductDetails() {
 
   const [favorited, setFavorited] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
-  const [chatStarting, setChatStarting] = useState(false);
-  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
         setLoading(true);
@@ -33,78 +32,96 @@ export default function ProductDetails() {
       } catch (err) {
         if (!cancelled) {
           const status = err.response?.status;
-          setError(
-            status === 404
-              ? "This product no longer exists or has been removed."
-              : err.response?.data?.message || "Failed to load product."
-          );
+          if (status === 404) {
+            setError("This product no longer exists or has been removed.");
+          } else {
+            setError(err.response?.data?.message || "Failed to load product.");
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
     if (!isAuthenticated || !id) return;
     let cancelled = false;
-    favoriteApi.check(id).then((r) => {
-      if (!cancelled) setFavorited(r.favorited);
-    }).catch(() => {});
-    return () => { cancelled = true; };
+    favoriteApi
+      .check(id)
+      .then((r) => {
+        if (!cancelled) setFavorited(r.favorited);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated, id]);
 
   const isOwnProduct =
     user?.id && product?.seller?.id && user.id === product.seller.id;
 
   const handleSave = async () => {
-    if (!isAuthenticated) return navigate("/login");
-    if (isOwnProduct) return alert("You cannot favorite your own product.");
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    if (isOwnProduct) {
+      alert("You cannot favorite your own product.");
+      return;
+    }
     if (favBusy) return;
+
     setFavBusy(true);
     try {
       if (favorited) {
         await favoriteApi.remove(product.id);
         setFavorited(false);
-        setProduct((p) => ({ ...p, favoriteCount: Math.max(0, (p.favoriteCount ?? 1) - 1) }));
+        setProduct((p) => ({
+          ...p,
+          favoriteCount: Math.max(0, (p.favoriteCount ?? 1) - 1),
+        }));
       } else {
         await favoriteApi.add(product.id);
         setFavorited(true);
-        setProduct((p) => ({ ...p, favoriteCount: (p.favoriteCount ?? 0) + 1 }));
+        setProduct((p) => ({
+          ...p,
+          favoriteCount: (p.favoriteCount ?? 0) + 1,
+        }));
       }
     } catch (err) {
-      if (err.response?.status === 409) setFavorited(true);
-      else alert(err.response?.data?.message || "Something went wrong.");
+      const msg = err.response?.data?.message || "Something went wrong.";
+      if (err.response?.status === 409) {
+        setFavorited(true);
+      } else {
+        alert(msg);
+      }
     } finally {
       setFavBusy(false);
     }
   };
 
   const handleChat = async () => {
-    if (!isAuthenticated) return navigate("/login");
-    if (isOwnProduct) return alert("You cannot chat with yourself.");
-    if (chatStarting) return;
-    setChatStarting(true);
-    try {
-      const conv = await chatApi.start(product.id);
-      navigate(`/messages/${conv.id}`);
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to start conversation");
-    } finally {
-      setChatStarting(false);
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
     }
-  };
+    if (isOwnProduct) return;
+    if (chatBusy) return;
 
-  const handleBuy = () => {
-    if (!isAuthenticated) return navigate("/login");
-    if (isOwnProduct) return alert("You cannot buy your own product.");
-    setBuyModalOpen(true);
-  };
-
-  const handleOrderSuccess = (order) => {
-    setBuyModalOpen(false);
-    navigate("/orders", { state: { newOrderId: order.id } });
+    setChatBusy(true);
+    try {
+      const conversation = await chatApi.startConversation(product.id);
+      navigate(`/messages?c=${conversation.id}`);
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not start chat.");
+    } finally {
+      setChatBusy(false);
+    }
   };
 
   if (loading) {
@@ -120,7 +137,10 @@ export default function ProductDetails() {
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <p className="text-lg text-gray-700 mb-2">{error}</p>
-          <Link to="/browse" className="text-maroon-700 font-semibold hover:underline">
+          <Link
+            to="/browse"
+            className="text-maroon-700 font-semibold hover:underline"
+          >
             ← Back to browse
           </Link>
         </div>
@@ -140,7 +160,6 @@ export default function ProductDetails() {
     "?";
 
   const isSold = product.status === "SOLD";
-  const outOfStock = (product.quantity ?? 0) <= 0;
 
   return (
     <div className="bg-white min-h-[calc(100vh-64px)]">
@@ -168,9 +187,9 @@ export default function ProductDetails() {
           <ImageGallery images={product.images} alt={product.name} />
 
           <div>
-            {(isSold || outOfStock) && (
+            {isSold && (
               <div className="mb-4 inline-block bg-gray-800 text-white text-sm font-bold px-3 py-1 rounded">
-                {isSold ? "SOLD" : "OUT OF STOCK"}
+                SOLD
               </div>
             )}
 
@@ -235,30 +254,18 @@ export default function ProductDetails() {
               </div>
             )}
 
-            {/* Action buttons */}
-            <div className="space-y-3 mb-6">
-              {!isOwnProduct && !isSold && !outOfStock && (
-                <button
-                  type="button"
-                  onClick={handleBuy}
-                  className="w-full bg-maroon-700 hover:bg-maroon-800 text-white font-bold py-3.5 rounded-lg transition text-lg"
-                >
-                  🛒 Buy Now — {formatNaira(product.effectivePrice)}
-                </button>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                {!isOwnProduct && (
+            <div className="flex flex-col sm:flex-row gap-3 mb-6">
+              {!isOwnProduct ? (
+                <>
                   <button
                     type="button"
-                    disabled={chatStarting}
+                    disabled={isSold || chatBusy}
                     onClick={handleChat}
-                    className="flex-1 bg-white border-2 border-maroon-700 text-maroon-700 hover:bg-maroon-50 disabled:opacity-60 font-semibold py-3 rounded-lg transition"
+                    className="flex-1 bg-maroon-700 hover:bg-maroon-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition"
                   >
-                    {chatStarting ? "Opening..." : "💬 Chat with Seller"}
+                    {chatBusy ? "Opening chat…" : "💬 Chat with Seller"}
                   </button>
-                )}
-                {!isOwnProduct && (
+
                   <button
                     type="button"
                     onClick={handleSave}
@@ -271,11 +278,9 @@ export default function ProductDetails() {
                   >
                     {favorited ? "♥ Saved" : "♡ Save"}
                   </button>
-                )}
-              </div>
-
-              {isOwnProduct && (
-                <div className="text-sm text-gray-500 italic py-3 text-center">
+                </>
+              ) : (
+                <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 w-full">
                   This is your listing.
                 </div>
               )}
@@ -299,13 +304,6 @@ export default function ProductDetails() {
           </div>
         </div>
       </div>
-
-      <BuyOrderModal
-        open={buyModalOpen}
-        product={product}
-        onClose={() => setBuyModalOpen(false)}
-        onSuccess={handleOrderSuccess}
-      />
     </div>
   );
 }

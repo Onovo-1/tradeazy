@@ -1,113 +1,127 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { chatApi } from "../../api/chatApi";
-import { useChat } from "../../context/ChatContext";
 import ConversationList from "../../components/chat/ConversationList";
 import ChatWindow from "../../components/chat/ChatWindow";
 
 export default function Messages() {
-  const { conversationId } = useParams();
-  const navigate = useNavigate();
-  const { refreshUnread } = useChat();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeId = searchParams.get("c")
+    ? parseInt(searchParams.get("c"), 10)
+    : null;
 
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
-  const [active, setActive] = useState(null);
+  const [tab, setTab] = useState("all"); // "all" | "unread"
+  const [error, setError] = useState(null);
 
-  const loadConversations = async () => {
-    setLoading(true);
+  const loadConversations = useCallback(async () => {
     try {
-      const res = await chatApi.list({
-        unread: filter === "unread",
+      setError(null);
+      const res = await chatApi.listConversations({
+        unread: tab === "unread",
         page: 0,
-        size: 50,
+        size: 100,
       });
-      const list = res.content || [];
-      setConversations(list);
-
-      // Auto-select first
-      if (list.length > 0) {
-        const requested = conversationId ? Number(conversationId) : null;
-        const target = requested
-          ? list.find((c) => c.id === requested) || list[0]
-          : list[0];
-        setActive(target);
-      } else {
-        setActive(null);
-      }
-    } catch {
-      setConversations([]);
-      setActive(null);
+      setConversations(res.content || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load conversations");
     } finally {
       setLoading(false);
     }
-  };
+  }, [tab]);
 
   useEffect(() => {
     loadConversations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, [loadConversations]);
+
+  // If there's an active conversation, load its full details for the header
+  const active = conversations.find((c) => c.id === activeId);
 
   const handleSelect = (id) => {
-    const conv = conversations.find((c) => c.id === id);
-    if (conv) {
-      setActive(conv);
-      navigate(`/messages/${id}`, { replace: true });
-      chatApi.markRead(id).then(() => refreshUnread()).catch(() => {});
-    }
+    setSearchParams({ c: id });
   };
 
-  const handleBack = () => {
-    setActive(null);
-    navigate("/messages", { replace: true });
-  };
-
-  const handleNewMessage = () => {
-    refreshUnread();
+  const handleRead = () => {
+    // refresh list so the unread badge disappears
+    loadConversations();
   };
 
   return (
-    <div className="bg-white min-h-[calc(100vh-64px)]">
-      <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="bg-gray-50 min-h-[calc(100vh-64px)]">
+      <div className="max-w-7xl mx-auto px-4 py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Messages</h1>
 
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: "500px" }}>
-          <div className="grid grid-cols-1 md:grid-cols-3 h-full">
-            {/* List — hidden on mobile when a chat is open */}
-            <div
-              className={`md:col-span-1 h-full ${
-                active ? "hidden md:block" : "block"
-              }`}
-            >
-              <ConversationList
-                conversations={conversations}
-                activeId={active?.id}
-                onSelect={handleSelect}
-                filter={filter}
-                onFilterChange={setFilter}
-                loading={loading}
-              />
+        <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
+          {/* Sidebar */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setTab("all")}
+                className={`flex-1 py-2 text-sm font-medium transition ${
+                  tab === "all"
+                    ? "text-maroon-700 border-b-2 border-maroon-700"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setTab("unread")}
+                className={`flex-1 py-2 text-sm font-medium transition ${
+                  tab === "unread"
+                    ? "text-maroon-700 border-b-2 border-maroon-700"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Unread
+              </button>
             </div>
 
-            {/* Window — hidden on mobile when nothing selected */}
-            <div
-              className={`md:col-span-2 h-full ${
-                active ? "block" : "hidden md:block"
-              }`}
-            >
-              {active ? (
-                <ChatWindow
-                  conversation={active}
-                  onBack={handleBack}
-                  onMessageSent={handleNewMessage}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-500 text-sm bg-gray-50">
-                  Select a conversation to start chatting
-                </div>
-              )}
-            </div>
+            {loading ? (
+              <div className="text-center py-6 text-sm text-gray-500">
+                Loading…
+              </div>
+            ) : (
+              <ConversationList
+                conversations={conversations}
+                activeId={activeId}
+                onSelect={handleSelect}
+              />
+            )}
+          </div>
+
+          {/* Main panel */}
+          <div>
+            {error && (
+              <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
+            {active ? (
+              <ChatWindow
+                conversationId={active.id}
+                peer={{
+                  id: active.peerId,
+                  username: active.peerUsername,
+                  firstName: active.peerFirstName,
+                  lastName: active.peerLastName,
+                }}
+                product={{
+                  id: active.productId,
+                  name: active.productName,
+                }}
+                onRead={handleRead}
+              />
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 h-[calc(100vh-160px)] flex items-center justify-center text-gray-500 text-sm">
+                {conversations.length
+                  ? "Pick a conversation to start chatting"
+                  : "No conversations yet"}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,164 +1,134 @@
 import { useEffect, useRef, useState } from "react";
-import { chatApi } from "../../api/chatApi";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { formatRelativeTime } from "../../utils/formatters";
+import { useChat } from "../../hooks/useChat";
+import { chatApi } from "../../api/chatApi";
 
-export default function ChatWindow({ conversation, onBack, onMessageSent }) {
+const API_ROOT = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api"
+).replace(/\/api$/, "");
+
+function formatTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default function ChatWindow({ conversationId, peer, product, onRead }) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState(null);
+  const { messages, loading, sending, send } = useChat(conversationId);
+  const [draft, setDraft] = useState("");
+  const scrollRef = useRef(null);
 
-  const bottomRef = useRef(null);
-  const pollRef = useRef(null);
-
-  const loadMessages = async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const res = await chatApi.messages(conversation.id, { page: 0, size: 200 });
-      setMessages(res.content || []);
-    } catch (err) {
-      if (!silent) setError(err.response?.data?.message || "Failed to load messages");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
-
+  // mark read on open + whenever new messages arrive
   useEffect(() => {
-    setMessages([]);
-    setContent("");
-    setError(null);
-    loadMessages();
-    // Mark read
-    chatApi.markRead(conversation.id).then(() => {
-      if (onMessageSent) onMessageSent();
+    if (!conversationId) return;
+    chatApi.markRead(conversationId).then(() => {
+      onRead?.();
     }).catch(() => {});
+  }, [conversationId, messages.length, onRead]);
 
-    // Poll every 5s for new messages
-    pollRef.current = setInterval(() => loadMessages(true), 5000);
-    return () => clearInterval(pollRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation.id]);
-
+  // auto-scroll to bottom
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
-  const handleSend = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const text = content.trim();
-    if (!text || sending) return;
-
-    setSending(true);
-    setError(null);
-    try {
-      const msg = await chatApi.send(conversation.id, text);
-      setMessages((prev) => [...prev, msg]);
-      setContent("");
-      if (onMessageSent) onMessageSent();
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to send message");
-    } finally {
-      setSending(false);
-    }
+    const text = draft.trim();
+    if (!text) return;
+    setDraft("");
+    await send(text);
   };
-
-  const peerName =
-    [conversation.peerFirstName, conversation.peerLastName]
-      .filter(Boolean)
-      .join(" ") || conversation.peerUsername;
-
-  const initial = peerName[0]?.toUpperCase() ?? "?";
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-[calc(100vh-160px)] bg-white rounded-xl border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="md:hidden text-gray-600 hover:text-gray-900 text-xl"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div className="w-10 h-10 rounded-full bg-maroon-700 text-white flex items-center justify-center font-bold shrink-0">
-          {initial}
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-maroon-700 text-white flex items-center justify-center font-bold">
+          {peer?.firstName?.[0]?.toUpperCase() ||
+            peer?.username?.[0]?.toUpperCase() ||
+            "?"}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{peerName}</p>
-          <p className="text-xs text-maroon-700 truncate">
-            About: {conversation.productName}
-          </p>
+          <div className="font-semibold text-gray-900 truncate">
+            {peer?.firstName} {peer?.lastName}
+          </div>
+          <div className="text-xs text-gray-500 truncate">
+            @{peer?.username}
+          </div>
         </div>
+        {product && (
+          <Link
+            to={`/products/${product.id}`}
+            className="text-xs text-maroon-700 hover:underline shrink-0"
+          >
+            about {product.name} →
+          </Link>
+        )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto bg-gray-50 px-4 py-3 space-y-3"
+      >
         {loading ? (
-          <div className="text-center text-sm text-gray-500 py-8">Loading messages...</div>
+          <div className="text-center text-sm text-gray-500 py-6">Loading…</div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-sm text-gray-500 py-8">
-            No messages yet. Say hello!
+          <div className="text-center text-sm text-gray-500 py-6">
+            No messages yet. Say hi 👋
           </div>
         ) : (
           messages.map((m) => {
-            const isMine = m.senderId === user?.id;
+            const mine = m.senderId === user?.id;
             return (
               <div
                 key={m.id}
-                className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                className={`flex ${mine ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
-                    isMine
+                  className={`max-w-[70%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
+                    mine
                       ? "bg-maroon-700 text-white rounded-br-sm"
-                      : "bg-white text-gray-900 border border-gray-200 rounded-bl-sm"
+                      : "bg-white text-gray-900 rounded-bl-sm border border-gray-200"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap break-words">
-                    {m.content}
-                  </p>
-                  <p
+                  <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                  <div
                     className={`text-[10px] mt-1 ${
-                      isMine ? "text-maroon-200" : "text-gray-400"
-                    }`}
+                      mine ? "text-maroon-200" : "text-gray-400"
+                    } text-right`}
                   >
-                    {formatRelativeTime(m.createdAt)}
-                  </p>
+                    {formatTime(m.createdAt)}
+                  </div>
                 </div>
               </div>
             );
           })
         )}
-        <div ref={bottomRef} />
       </div>
 
-      {error && (
-        <div className="mx-4 mb-2 p-2 rounded bg-red-50 border border-red-200 text-red-700 text-xs">
-          {error}
-        </div>
-      )}
-
-      {/* Input */}
+      {/* Composer */}
       <form
-        onSubmit={handleSend}
-        className="bg-white border-t border-gray-200 p-3 flex items-center gap-2"
+        onSubmit={handleSubmit}
+        className="border-t border-gray-200 px-3 py-2 flex gap-2 bg-white"
       >
         <input
           type="text"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Type a message..."
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Type a message…"
           disabled={sending}
-          maxLength={2000}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
         />
         <button
           type="submit"
-          disabled={sending || !content.trim()}
-          className="bg-maroon-700 hover:bg-maroon-800 disabled:opacity-40 text-white font-semibold px-4 py-2 rounded-lg text-sm transition"
+          disabled={sending || !draft.trim()}
+          className="bg-maroon-700 hover:bg-maroon-800 disabled:opacity-50 text-white font-semibold px-4 rounded-lg transition"
         >
           Send
         </button>
