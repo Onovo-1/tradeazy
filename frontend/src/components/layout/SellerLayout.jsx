@@ -4,6 +4,7 @@ const navItems = [
   { to: "/seller", label: "Overview", end: true },
   { to: "/seller/products", label: "My Products" },
   { to: "/seller/products/new", label: "Add Product" },
+  { to: "/seller/orders", label: "Orders" },
   { to: "/seller/rent", label: "Rent" },
 ];
 
@@ -38,11 +39,4 @@ export default function SellerLayout() {
             </div>
           </aside>
 
-          <main className="flex-1 min-w-0">
-            <Outlet />
-          </main>
-        </div>
-      </div>
-    </div>
-  );
-}
+          <main className="flex-1 min

@@ -37,9 +37,7 @@ export default function Navbar() {
         <div className="flex items-center gap-4 text-sm ml-auto shrink-0">
           {!isAuthenticated ? (
             <>
-              <Link to="/login" className="hover:text-maroon-200 transition">
-                Login
-              </Link>
+              <Link to="/login" className="hover:text-maroon-200 transition">Login</Link>
               <Link
                 to="/register"
                 className="bg-maroon-600 hover:bg-maroon-500 px-4 py-1.5 rounded-lg font-semibold transition"
@@ -61,6 +59,12 @@ export default function Navbar() {
                 )}
               </Link>
               <Link
+                to="/orders"
+                className="hover:text-maroon-200 transition hidden sm:inline"
+              >
+                Orders
+              </Link>
+              <Link
                 to="/favorites"
                 className="hover:text-maroon-200 transition hidden sm:inline"
               >
@@ -68,19 +72,13 @@ export default function Navbar() {
               </Link>
               <span className="text-maroon-200 hidden md:inline">
                 Hi,{" "}
-                <span className="font-semibold text-white">
-                  {user?.firstName}
-                </span>
+                <span className="font-semibold text-white">{user?.firstName}</span>
               </span>
               {user?.roles?.includes("ADMIN") && (
-                <Link to="/admin" className="hover:text-maroon-200 transition">
-                  Admin
-                </Link>
+                <Link to="/admin" className="hover:text-maroon-200 transition">Admin</Link>
               )}
               {user?.roles?.includes("SELLER") && (
-                <Link to="/seller" className="hover:text-maroon-200 transition">
-                  Seller
-                </Link>
+                <Link to="/seller" className="hover:text-maroon-200 transition">Seller</Link>
               )}
               <button
                 onClick={handleLogout}

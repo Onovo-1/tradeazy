@@ -5,6 +5,7 @@ import { favoriteApi } from "../../api/favoriteApi";
 import { chatApi } from "../../api/chatApi";
 import { useAuth } from "../../context/AuthContext";
 import ImageGallery from "../../components/product/ImageGallery";
+import BuyOrderModal from "../../components/order/BuyOrderModal";
 import { formatNaira, formatRelativeTime } from "../../utils/formatters";
 
 export default function ProductDetails() {
@@ -19,6 +20,7 @@ export default function ProductDetails() {
   const [favorited, setFavorited] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
   const [chatStarting, setChatStarting] = useState(false);
+  const [buyModalOpen, setBuyModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,23 +43,16 @@ export default function ProductDetails() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [id]);
 
   useEffect(() => {
     if (!isAuthenticated || !id) return;
     let cancelled = false;
-    favoriteApi
-      .check(id)
-      .then((r) => {
-        if (!cancelled) setFavorited(r.favorited);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+    favoriteApi.check(id).then((r) => {
+      if (!cancelled) setFavorited(r.favorited);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [isAuthenticated, id]);
 
   const isOwnProduct =
@@ -101,6 +96,17 @@ export default function ProductDetails() {
     }
   };
 
+  const handleBuy = () => {
+    if (!isAuthenticated) return navigate("/login");
+    if (isOwnProduct) return alert("You cannot buy your own product.");
+    setBuyModalOpen(true);
+  };
+
+  const handleOrderSuccess = (order) => {
+    setBuyModalOpen(false);
+    navigate("/orders", { state: { newOrderId: order.id } });
+  };
+
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
@@ -134,6 +140,7 @@ export default function ProductDetails() {
     "?";
 
   const isSold = product.status === "SOLD";
+  const outOfStock = (product.quantity ?? 0) <= 0;
 
   return (
     <div className="bg-white min-h-[calc(100vh-64px)]">
@@ -161,9 +168,9 @@ export default function ProductDetails() {
           <ImageGallery images={product.images} alt={product.name} />
 
           <div>
-            {isSold && (
+            {(isSold || outOfStock) && (
               <div className="mb-4 inline-block bg-gray-800 text-white text-sm font-bold px-3 py-1 rounded">
-                SOLD
+                {isSold ? "SOLD" : "OUT OF STOCK"}
               </div>
             )}
 
@@ -228,35 +235,47 @@ export default function ProductDetails() {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              {!isOwnProduct && (
+            {/* Action buttons */}
+            <div className="space-y-3 mb-6">
+              {!isOwnProduct && !isSold && !outOfStock && (
                 <button
                   type="button"
-                  disabled={isSold || chatStarting}
-                  onClick={handleChat}
-                  className="flex-1 bg-maroon-700 hover:bg-maroon-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition"
+                  onClick={handleBuy}
+                  className="w-full bg-maroon-700 hover:bg-maroon-800 text-white font-bold py-3.5 rounded-lg transition text-lg"
                 >
-                  {chatStarting ? "Opening chat..." : "💬 Chat with Seller"}
+                  🛒 Buy Now — {formatNaira(product.effectivePrice)}
                 </button>
               )}
 
-              {!isOwnProduct && (
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={favBusy}
-                  className={`sm:w-40 font-semibold py-3 rounded-lg transition border ${
-                    favorited
-                      ? "bg-maroon-700 text-white border-maroon-700 hover:bg-maroon-800"
-                      : "border-maroon-700 text-maroon-700 hover:bg-maroon-50"
-                  } disabled:opacity-60`}
-                >
-                  {favorited ? "♥ Saved" : "♡ Save"}
-                </button>
-              )}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {!isOwnProduct && (
+                  <button
+                    type="button"
+                    disabled={chatStarting}
+                    onClick={handleChat}
+                    className="flex-1 bg-white border-2 border-maroon-700 text-maroon-700 hover:bg-maroon-50 disabled:opacity-60 font-semibold py-3 rounded-lg transition"
+                  >
+                    {chatStarting ? "Opening..." : "💬 Chat with Seller"}
+                  </button>
+                )}
+                {!isOwnProduct && (
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={favBusy}
+                    className={`sm:w-40 font-semibold py-3 rounded-lg transition border ${
+                      favorited
+                        ? "bg-maroon-700 text-white border-maroon-700 hover:bg-maroon-800"
+                        : "border-maroon-700 text-maroon-700 hover:bg-maroon-50"
+                    } disabled:opacity-60`}
+                  >
+                    {favorited ? "♥ Saved" : "♡ Save"}
+                  </button>
+                )}
+              </div>
 
               {isOwnProduct && (
-                <div className="flex-1 text-sm text-gray-500 italic py-3">
+                <div className="text-sm text-gray-500 italic py-3 text-center">
                   This is your listing.
                 </div>
               )}
@@ -280,6 +299,13 @@ export default function ProductDetails() {
           </div>
         </div>
       </div>
+
+      <BuyOrderModal
+        open={buyModalOpen}
+        product={product}
+        onClose={() => setBuyModalOpen(false)}
+        onSuccess={handleOrderSuccess}
+      />
     </div>
   );
 }
