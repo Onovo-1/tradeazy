@@ -15,6 +15,10 @@ import MyProducts from "./pages/seller/MyProducts";
 import AddProduct from "./pages/seller/AddProduct";
 import Rent from "./pages/seller/Rent";
 import SellerOrders from "./pages/seller/SellerOrders";
+import AdminLayout from "./components/layout/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminProducts from "./pages/admin/AdminProducts";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 
 export default function App() {
@@ -31,45 +35,24 @@ export default function App() {
           <Route path="/register" element={<Register />} />
 
           {/* Buyer */}
-          <Route
-            path="/favorites"
-            element={
-              <ProtectedRoute>
-                <Favorites />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/messages"
-            element={
-              <ProtectedRoute>
-                <Messages />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders"
-            element={
-              <ProtectedRoute>
-                <Orders />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
+          <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+          <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
 
           {/* Seller */}
-          <Route
-            path="/seller"
-            element={
-              <ProtectedRoute>
-                <SellerLayout />
-              </ProtectedRoute>
-            }
-          >
+          <Route path="/seller" element={<ProtectedRoute><SellerLayout /></ProtectedRoute>}>
             <Route index element={<SellerDashboard />} />
             <Route path="products" element={<MyProducts />} />
             <Route path="products/new" element={<AddProduct />} />
             <Route path="rent" element={<Rent />} />
             <Route path="orders" element={<SellerOrders />} />
+          </Route>
+
+          {/* Admin */}
+          <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="products" element={<AdminProducts />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
