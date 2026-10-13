@@ -2,49 +2,42 @@
 
 A multi-vendor marketplace built with **Spring Boot + React + MySQL**.
 
-Tradeazy connects buyers and sellers. Sellers pay a monthly **Rent** subscription to list products. Buyers browse, save favorites, negotiate, and purchase via in-app chat.
+Sellers pay a monthly "Rent" to list products. Buyers browse, save favorites, chat with sellers, negotiate prices, place orders, and complete purchases.
 
 ---
 
-## 📋 Project Status
+## 📋 Status
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 0 | Foundation — Spring Boot, React, MySQL, CORS | ✅ Complete |
-| 1 | Authentication & Roles — JWT, register, login, protected routes | ✅ Complete |
-| 2 | Products & Categories — CRUD, images, seller dashboard | ✅ Complete |
-| 3 | Search & Filters | 🔜 Planned |
-| 4 | Favorites | 🔜 Planned |
-| 5 | Rent / Subscriptions | 🔜 Planned |
-| 6 | Orders | 🔜 Planned |
-| 7 | Chat | 🔜 Planned |
-| 8 | Offers & Payment Plans | 🔜 Planned |
-| 9 | Admin Dashboard | 🔜 Planned |
-| 10 | Polish, Tests, Deployment | 🔜 Planned |
+| Phase | What | Status |
+|-------|------|--------|
+| 0 | Foundation — Spring Boot + React + MySQL + CORS | ✅ |
+| 1 | Authentication & Roles — JWT, register, login | ✅ |
+| 2 | Products & Categories — CRUD, images, seller dashboard | ✅ |
+| 3 | Search & Filters — keyword, price, category, location, condition | ✅ |
+| 4 | Favorites — save/unsave products | ✅ |
+| 5 | Rent Subscriptions — monthly seller fee with mock payment | ✅ |
+| 6 | Orders — buyer purchase flow, seller order management | ✅ |
+| 7 | Chat — buyer ↔ seller messaging with unread tracking | ✅ |
+| 8 | Offers — structured price negotiation inside chat | ✅ |
+| 9 | Admin Dashboard — stats, user management, product moderation | ✅ |
+| 10 | Polish, Tests, Deployment Prep | ✅ |
+
+**13+ unit tests passing.**
 
 ---
 
 ## 🏗️ Tech Stack
 
-### Backend
-- **Java 21**
-- **Spring Boot 4.x**
-- Spring Web (REST APIs)
-- Spring Data JPA + Hibernate
-- Spring Security + JWT (jjwt)
-- MySQL 8
-- Maven
-- Lombok
-- Swagger / OpenAPI (springdoc)
+**Backend**
+- Java 21 · Spring Boot 4 · Spring Web · Spring Data JPA · Spring Security
+- Hibernate ORM · MySQL 8 · Maven
+- JWT (jjwt) · Lombok · SpringDoc OpenAPI / Swagger UI
 
-### Frontend
-- **React 18** with **Vite**
-- React Router v6
-- Axios
-- Tailwind CSS
+**Frontend**
+- React 18 · Vite · React Router v6 · Axios · Tailwind CSS
 
-### Database
-- MySQL 8 (`tradeazy_db`)
+**Database**
+- MySQL 8 (`tradeazy_db`) — 12 tables
 
 ---
 
@@ -52,12 +45,11 @@ Tradeazy connects buyers and sellers. Sellers pay a monthly **Rent** subscriptio
 
 ### Prerequisites
 
-- **Java 21** (JDK)
-- **Maven** (or use the included `./mvnw`)
-- **Node.js 20+**
-- **MySQL 8**
+- Java 21 (JDK)
+- Node.js 20+
+- MySQL 8
 
-### 1. Database Setup
+### Database
 
 ```sql
 CREATE DATABASE tradeazy_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

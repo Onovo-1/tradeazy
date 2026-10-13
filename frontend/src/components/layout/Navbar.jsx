@@ -21,8 +21,17 @@ export default function Navbar() {
   return (
     <nav className="bg-maroon-900 text-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
-        <Link to="/" className="text-2xl font-extrabold tracking-tight shrink-0">
-          Tradeazy
+        {/* Logo + wordmark */}
+        <Link
+          to="/"
+          className="flex items-center gap-2 shrink-0 hover:opacity-90 transition"
+        >
+          <img
+            src="/tradeazy-logo.png"
+            alt="Tradeazy"
+            className="h-9 w-9 object-contain"
+          />
+          <span className="text-2xl font-extrabold tracking-tight">Tradeazy</span>
         </Link>
 
         <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md">
