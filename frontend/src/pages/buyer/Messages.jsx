@@ -12,7 +12,7 @@ export default function Messages() {
 
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("all"); // "all" | "unread"
+  const [tab, setTab] = useState("all");
   const [error, setError] = useState(null);
 
   const loadConversations = useCallback(async () => {
@@ -35,17 +35,10 @@ export default function Messages() {
     loadConversations();
   }, [loadConversations]);
 
-  // If there's an active conversation, load its full details for the header
   const active = conversations.find((c) => c.id === activeId);
 
-  const handleSelect = (id) => {
-    setSearchParams({ c: id });
-  };
-
-  const handleRead = () => {
-    // refresh list so the unread badge disappears
-    loadConversations();
-  };
+  const handleSelect = (id) => setSearchParams({ c: id });
+  const handleRead = () => loadConversations();
 
   return (
     <div className="bg-gray-50 min-h-[calc(100vh-64px)]">
@@ -53,9 +46,7 @@ export default function Messages() {
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Messages</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
-          {/* Sidebar */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {/* Tabs */}
             <div className="flex border-b border-gray-200">
               <button
                 onClick={() => setTab("all")}
@@ -92,7 +83,6 @@ export default function Messages() {
             )}
           </div>
 
-          {/* Main panel */}
           <div>
             {error && (
               <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -113,6 +103,7 @@ export default function Messages() {
                   id: active.productId,
                   name: active.productName,
                 }}
+                role={active.role}
                 onRead={handleRead}
               />
             ) : (

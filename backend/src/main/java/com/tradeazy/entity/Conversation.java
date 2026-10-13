@@ -7,14 +7,6 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A chat thread between a buyer and a seller about a specific product.
- *
- * Unique constraint on (buyer_id, seller_id, product_id) prevents duplicate
- * conversations about the same product between the same two users.
- *
- * `lastMessageAt` is denormalized for fast sorting of the conversation list.
- */
 @Entity
 @Table(
     name = "conversations",
@@ -62,6 +54,10 @@ public class Conversation {
     )
     @Builder.Default
     private List<Message> messages = new ArrayList<>();
+
+    @OneToMany(mappedBy = "conversation", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Offer> offers = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
