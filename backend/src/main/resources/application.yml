@@ -32,7 +32,7 @@ tradeazy:
   upload:
     dir: ${UPLOAD_DIR:./uploads}
   cors:
-    allowed-origins: http://localhost:5173
+    allowed-origins: http://localhost:5173,http://192.168.0.196:5173
   seed:
     admin:
       username: ${ADMIN_USERNAME:superadmin}

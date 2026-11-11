@@ -6,6 +6,7 @@ import com.tradeazy.dto.response.ProductResponse;
 import com.tradeazy.dto.response.ProductSummaryResponse;
 import com.tradeazy.entity.Category;
 import com.tradeazy.entity.Product;
+import com.tradeazy.entity.ProductImage;
 import com.tradeazy.entity.User;
 import com.tradeazy.entity.enums.ProductCondition;
 import com.tradeazy.entity.enums.ProductStatus;
@@ -14,6 +15,7 @@ import com.tradeazy.exception.InvalidOperationException;
 import com.tradeazy.exception.ResourceNotFoundException;
 import com.tradeazy.mapper.ProductMapper;
 import com.tradeazy.repository.CategoryRepository;
+import com.tradeazy.repository.ProductImageRepository;
 import com.tradeazy.repository.ProductRepository;
 import com.tradeazy.repository.UserRepository;
 import com.tradeazy.specification.ProductSpecification;
@@ -26,8 +28,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -38,21 +42,18 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final ProductImageRepository productImageRepository;
+    private final FileStorageService fileStorageService;
     private final SubscriptionService subscriptionService;
 
-    private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
 
-    // ============================================================
-    // CREATE — with the Rent check
-    // ============================================================
+    // ================= CREATE =================
     @Transactional
     public ProductResponse create(ProductRequest request, Long sellerId) {
         if (!subscriptionService.hasActiveRent(sellerId)) {
             throw new InvalidOperationException(
-                    "Your Rent subscription is not active. "
-                    + "Renew your Rent to create new listings. "
-                    + "Your existing listings remain visible."
+                "Your Rent subscription is not active. Renew your Rent to create new listings."
             );
         }
 
@@ -60,9 +61,7 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Seller not found: " + sellerId));
 
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Category not found: " + request.getCategoryId()
-                ));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + request.getCategoryId()));
 
         Product product = Product.builder()
                 .name(request.getName())
@@ -83,6 +82,7 @@ public class ProductService {
         return ProductMapper.toResponse(saved);
     }
 
+    // ================= UPDATE =================
     @Transactional
     public ProductResponse update(Long productId, ProductRequest request, Long sellerId) {
         Product product = productRepository.findByIdAndSellerId(productId, sellerId)
@@ -96,9 +96,7 @@ public class ProductService {
         }
 
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Category not found: " + request.getCategoryId()
-                ));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + request.getCategoryId()));
 
         product.setName(request.getName());
         product.setDescription(request.getDescription());
@@ -111,10 +109,10 @@ public class ProductService {
         product.setSpecifications(request.getSpecifications());
 
         Product saved = productRepository.save(product);
-        log.info("Product updated: id={}, sellerId={}", saved.getId(), sellerId);
         return ProductMapper.toResponse(saved);
     }
 
+    // ================= MARK SOLD =================
     @Transactional
     public ProductResponse markAsSold(Long productId, Long sellerId) {
         Product product = productRepository.findByIdAndSellerId(productId, sellerId)
@@ -126,13 +124,26 @@ public class ProductService {
         if (product.getStatus() == ProductStatus.REMOVED) {
             throw new InvalidOperationException("Cannot mark a removed product as sold");
         }
+        if (product.getQuantity() <= 0) {
+            throw new InvalidOperationException("Product is already out of stock");
+        }
 
-        product.setStatus(ProductStatus.SOLD);
+        // Decrement quantity
+        product.setQuantity(product.getQuantity() - 1);
+
+        // If we've just sold the last one, mark as SOLD
+        if (product.getQuantity() == 0) {
+            product.setStatus(ProductStatus.SOLD);
+            log.info("Product {} fully sold out (quantity = 0)", productId);
+        } else {
+            log.info("Product {} marked sold: 1 unit sold, {} remaining", productId, product.getQuantity());
+        }
+
         Product saved = productRepository.save(product);
-        log.info("Product marked SOLD: id={}, sellerId={}", productId, sellerId);
         return ProductMapper.toResponse(saved);
     }
 
+    // ================= DELETE =================
     @Transactional
     public void delete(Long productId, Long sellerId) {
         Product product = productRepository.findByIdAndSellerId(productId, sellerId)
@@ -142,9 +153,9 @@ public class ProductService {
 
         product.setStatus(ProductStatus.REMOVED);
         productRepository.save(product);
-        log.info("Product soft-deleted: id={}, sellerId={}", productId, sellerId);
     }
 
+    // ================= PUBLIC READS =================
     @Transactional
     public ProductResponse getPublicDetail(Long productId) {
         Product product = productRepository.findById(productId)
@@ -177,9 +188,16 @@ public class ProductService {
     public PagedResponse<ProductSummaryResponse> listByCategory(String slug, int page, int size, String sortBy) {
         Category category = categoryRepository.findBySlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + slug));
+        
+        List<Long> categoryIds = new ArrayList<>();
+        categoryIds.add(category.getId());
+        if (category.getChildren() != null) {
+            category.getChildren().forEach(child -> categoryIds.add(child.getId()));
+        }
+
         Pageable pageable = buildPageable(page, size, sortBy);
-        Page<Product> products = productRepository.findAllByCategoryIdAndStatus(
-                category.getId(), ProductStatus.ACTIVE, pageable
+        Page<Product> products = productRepository.findByCategoryIdsAndStatus(
+                categoryIds, ProductStatus.ACTIVE, pageable
         );
         return toPagedResponse(products);
     }
@@ -196,25 +214,15 @@ public class ProductService {
         return productRepository.countBySellerId(sellerId);
     }
 
-    // ============================================================
-    // SEARCH — Phase 3
-    // ============================================================
     @Transactional(readOnly = true)
     public PagedResponse<ProductSummaryResponse> search(
-            String q,
-            Long categoryId,
-            BigDecimal minPrice,
-            BigDecimal maxPrice,
-            String location,
-            ProductCondition condition,
-            int page,
-            int size,
-            String sortBy
+            String q, List<Long> categoryIds, BigDecimal minPrice, BigDecimal maxPrice,
+            String location, ProductCondition condition, int page, int size, String sortBy
     ) {
         Specification<Product> spec = Specification
                 .where(ProductSpecification.isActive())
                 .and(ProductSpecification.matchesKeyword(q))
-                .and(ProductSpecification.inCategory(categoryId))
+                .and(ProductSpecification.inCategories(categoryIds))
                 .and(ProductSpecification.priceBetween(minPrice, maxPrice))
                 .and(ProductSpecification.locationMatches(location))
                 .and(ProductSpecification.hasCondition(condition));
@@ -224,18 +232,70 @@ public class ProductService {
         return toPagedResponse(results);
     }
 
-    // ============================================================
-    // HELPERS
-    // ============================================================
+    // ================= IMAGES =================
+
+    @Transactional(readOnly = true)
+    public List<String> getProductImageUrls(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+        return product.getImages().stream().map(ProductImage::getUrl).toList();
+    }
+
+    @Transactional
+    public void addImageToProduct(Long productId, Long sellerId, MultipartFile file) {
+        Product product = productRepository.findByIdAndSellerId(productId, sellerId)
+                .orElseThrow(() -> new ForbiddenException("Product not found or you do not own it"));
+
+        String imageUrl = fileStorageService.store(file, "products");
+        boolean isPrimary = product.getImages().isEmpty();
+
+        ProductImage image = ProductImage.builder()
+                .product(product)
+                .url(imageUrl)
+                .isPrimary(isPrimary)
+                .displayOrder(product.getImages().size())
+                .build();
+
+        productImageRepository.save(image);
+        product.getImages().add(image);
+        productRepository.save(product);
+    }
+
+    @Transactional
+    public void setPrimaryImage(Long productId, Long sellerId, Long imageId) {
+        Product product = productRepository.findByIdAndSellerId(productId, sellerId)
+                .orElseThrow(() -> new ForbiddenException("Product not found or you do not own it"));
+
+        for (ProductImage img : product.getImages()) {
+            img.setIsPrimary(img.getId().equals(imageId));
+            productImageRepository.save(img);
+        }
+    }
+
+    @Transactional
+    public void deleteImage(Long productId, Long sellerId, Long imageId) {
+        Product product = productRepository.findByIdAndSellerId(productId, sellerId)
+                .orElseThrow(() -> new ForbiddenException("Product not found or you do not own it"));
+
+        ProductImage imageToDelete = product.getImages().stream()
+                .filter(img -> img.getId().equals(imageId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
+
+        fileStorageService.delete(imageToDelete.getUrl());
+        productImageRepository.delete(imageToDelete);
+    }
+
+    // ================= HELPERS =================
     private Pageable buildPageable(int page, int size, String sortBy) {
         int safePage = Math.max(0, page);
         int safeSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
 
         Sort sort = switch (sortBy == null ? "newest" : sortBy.toLowerCase()) {
-            case "price_asc"  -> Sort.by(Sort.Direction.ASC, "price");
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
             case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
-            case "popular"    -> Sort.by(Sort.Direction.DESC, "viewCount");
-            default           -> Sort.by(Sort.Direction.DESC, "createdAt");
+            case "popular" -> Sort.by(Sort.Direction.DESC, "viewCount");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
 
         return PageRequest.of(safePage, safeSize, sort);

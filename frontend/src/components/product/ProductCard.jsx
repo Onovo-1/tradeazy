@@ -1,66 +1,20 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { formatNaira, formatRelativeTime } from "../../utils/formatters";
 import { favoriteApi } from "../../api/favoriteApi";
 import { useAuth } from "../../context/AuthContext";
 
-const API_ROOT = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api"
-).replace(/\/api$/, "");
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api").replace(/\/api$/, "");
 
-export default function ProductCard({ product }) {
-  const { isAuthenticated, user } = useAuth();
+export default function ProductCard({ product, savedProductIds = [] }) {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // Check if this product's ID exists in the saved list passed from the parent
+  const [isSaved, setIsSaved] = useState(savedProductIds.includes(product.id));
+  const [saving, setSaving] = useState(false);
 
-  const [favorited, setFavorited] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const isOwnProduct =
-    user?.id && product.sellerId && user.id === product.sellerId;
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setFavorited(false);
-      return;
-    }
-    let cancelled = false;
-    favoriteApi
-      .check(product.id)
-      .then((r) => {
-        if (!cancelled) setFavorited(r.favorited);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, product.id]);
-
-  const handleFavorite = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!isAuthenticated) {
-      navigate("/login");
-      return;
-    }
-    if (isOwnProduct) return;
-    if (busy) return;
-
-    setBusy(true);
-    try {
-      if (favorited) {
-        await favoriteApi.remove(product.id);
-        setFavorited(false);
-      } else {
-        await favoriteApi.add(product.id);
-        setFavorited(true);
-      }
-    } catch (err) {
-      // silently ignore
-    } finally {
-      setBusy(false);
-    }
-  };
+  const isMyProduct = user?.id === product.sellerId;
 
   const hasDiscount =
     product.discountPercent > 0 &&
@@ -69,6 +23,30 @@ export default function ProductCard({ product }) {
   const imageUrl = product.primaryImageUrl
     ? `${API_ROOT}${product.primaryImageUrl}`
     : null;
+
+  const handleFavoriteClick = async (e) => {
+    e.preventDefault(); 
+    
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      if (isSaved) {
+        await favoriteApi.remove(product.id);
+        setIsSaved(false);
+      } else {
+        await favoriteApi.add(product.id);
+        setIsSaved(true);
+      }
+    } catch (err) {
+      console.error("Failed to update favorite", err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Link
@@ -89,6 +67,30 @@ export default function ProductCard({ product }) {
           </div>
         )}
 
+        {!isMyProduct && (
+          <button
+            onClick={handleFavoriteClick}
+            disabled={saving}
+            className="absolute top-2 right-2 p-1 transition z-10 hover:scale-110"
+            aria-label="Save to favorites"
+          >
+            <svg
+              className={`w-6 h-6 transition-colors drop-shadow-sm ${
+                isSaved ? "text-red-500 fill-red-500" : "text-gray-300 fill-none hover:text-gray-500"
+              }`}
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+          </button>
+        )}
+
         {hasDiscount && (
           <div className="absolute top-2 left-2 bg-maroon-700 text-white text-xs font-bold px-2 py-1 rounded">
             -{product.discountPercent}%
@@ -101,26 +103,6 @@ export default function ProductCard({ product }) {
               SOLD
             </span>
           </div>
-        )}
-
-        {!isOwnProduct && (
-          <button
-            type="button"
-            onClick={handleFavorite}
-            disabled={busy}
-            aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-            className="absolute top-2 right-2 w-9 h-9 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-sm border border-gray-200 disabled:opacity-60 transition"
-          >
-            <span
-              className={
-                favorited
-                  ? "text-maroon-700 text-lg leading-none"
-                  : "text-gray-500 text-lg leading-none"
-              }
-            >
-              {favorited ? "♥" : "♡"}
-            </span>
-          </button>
         )}
       </div>
 

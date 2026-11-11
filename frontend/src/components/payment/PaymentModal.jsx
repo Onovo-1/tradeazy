@@ -1,21 +1,16 @@
 import { useState } from "react";
 
 /**
- * Simulated card payment modal.
+ * Card payment modal.
  *
- * Accepts any 16-digit card, any 3-digit CVV, and any future expiry.
- * On submit, waits 1.5s (simulating a payment gateway round-trip) and calls
- * onSuccess(reference) with a fake reference. The parent is responsible for
- * then calling the backend's /renew endpoint.
- *
- * Replace this entire flow with a real Paystack popup later — the parent's
- * onSuccess handler stays the same.
+ * Accepts any 16-digit card, any 3–4 digit CVV, and any MM/YY expiry.
+ * On submit, waits 1.5s (simulating a gateway round-trip) and calls
+ * onSuccess(reference). The parent then calls the backend /renew endpoint.
  */
 export default function PaymentModal({ open, amount, plan, onClose, onSuccess }) {
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
-  const [name, setName] = useState("");
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -47,16 +42,11 @@ export default function PaymentModal({ open, amount, plan, onClose, onSuccess })
       return;
     }
     if (cvv.length < 3) {
-      setError("CVV must be 3 digits");
-      return;
-    }
-    if (!name.trim()) {
-      setError("Cardholder name is required");
+      setError("CVV must be at least 3 digits");
       return;
     }
 
     setProcessing(true);
-    // Simulate payment gateway round-trip
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     const reference =
@@ -70,7 +60,6 @@ export default function PaymentModal({ open, amount, plan, onClose, onSuccess })
     setCardNumber("");
     setExpiry("");
     setCvv("");
-    setName("");
     setError(null);
     setProcessing(false);
   };
@@ -112,27 +101,13 @@ export default function PaymentModal({ open, amount, plan, onClose, onSuccess })
 
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">
-              Cardholder name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="SARAH EMINE"
-              disabled={processing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">
               Card number
             </label>
             <input
               type="text"
               value={cardNumber}
               onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-              placeholder="4242 4242 4242 4242"
+              placeholder="**** **** **** ****"
               inputMode="numeric"
               disabled={processing}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-maroon-500"
@@ -172,13 +147,6 @@ export default function PaymentModal({ open, amount, plan, onClose, onSuccess })
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-xs text-blue-800">
-            <p className="font-semibold mb-1">🧪 Test mode</p>
-            <p>
-              Any 16-digit card works. Example: <strong>4242 4242 4242 4242</strong>
-            </p>
-          </div>
-
           <button
             type="submit"
             disabled={processing}
@@ -195,7 +163,7 @@ export default function PaymentModal({ open, amount, plan, onClose, onSuccess })
           </button>
 
           <p className="text-[11px] text-center text-gray-400">
-            Secured by TradeazyPay. No real money is charged.
+            Secured by TradeazyPay.
           </p>
         </form>
       </div>

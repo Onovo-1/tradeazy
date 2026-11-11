@@ -91,11 +91,15 @@ public class User {
 
     @OneToMany(mappedBy = "buyer", fetch = FetchType.LAZY)
     @Builder.Default
-    private List<Order> buyerOrders = new ArrayList<>();
+    private List<Order> purchases = new ArrayList<>();
 
     @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
     @Builder.Default
-    private List<Order> sellerOrders = new ArrayList<>();
+    private List<Order> sales = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Notification> notifications = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

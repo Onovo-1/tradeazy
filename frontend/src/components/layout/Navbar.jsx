@@ -1,11 +1,20 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 
 export default function Navbar() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { count } = useUnreadCount();
   const navigate = useNavigate();
-  const unread = useUnreadCount();
+  const location = useLocation();
+  
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const isAdmin = user?.roles?.includes("ADMIN");
+  const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+  const isSellerPage = location.pathname.startsWith("/seller");
+  const isAdminPage = location.pathname.startsWith("/admin");
 
   const handleLogout = () => {
     logout();
@@ -14,102 +23,106 @@ export default function Navbar() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    const q = e.target.q.value.trim();
-    navigate(q ? `/browse?q=${encodeURIComponent(q)}` : "/browse");
+    if (searchQuery.trim()) {
+      navigate(`/browse?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
   };
 
+  // Debugging log to see what the navbar thinks the count is
+  console.log("Navbar Render - Unread Count:", count);
+
   return (
-    <nav className="bg-maroon-900 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
-        {/* Logo + wordmark */}
-        <Link
-          to="/"
-          className="flex items-center gap-2 shrink-0 hover:opacity-90 transition"
-        >
-          <img
-            src="/tradeazy-logo.png"
-            alt="Tradeazy"
-            className="h-9 w-9 object-contain"
-          />
-          <span className="text-2xl font-extrabold tracking-tight">Tradeazy</span>
+    <nav className="bg-maroon-900 text-white relative z-50">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        
+        {/* Logo */}
+        <Link to={isAdmin ? "/admin/dashboard" : "/"} className="flex items-center gap-2">
+          <img src="/tradeazy-favicon.png" alt="Logo" className="h-8 w-auto object-contain" />
+          <span className="text-2xl font-bold tracking-tight">Tradeazy</span>
         </Link>
 
-        <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md">
-          <input
-            name="q"
-            type="text"
-            placeholder="Search products..."
-            className="w-full px-3 py-1.5 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-maroon-400"
-          />
-        </form>
+        {/* Search Bar */}
+        {!isAdmin && !isAuthPage && !isSellerPage && !isAdminPage && (
+          <form onSubmit={handleSearch} className="ml-8 w-full max-w-md hidden md:block">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search products..."
+              className="w-full px-4 py-1.5 rounded-full text-gray-900 text-sm focus:outline-none"
+            />
+          </form>
+        )}
 
-        <div className="flex items-center gap-4 text-sm ml-auto shrink-0">
-          {!isAuthenticated ? (
-            <>
-              <Link to="/login" className="hover:text-maroon-200 transition">
-                Login
-              </Link>
-              <Link
-                to="/register"
-                className="bg-maroon-600 hover:bg-maroon-500 px-4 py-1.5 rounded-lg font-semibold transition"
-              >
-                Register
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/favorites"
-                className="hover:text-maroon-200 transition hidden sm:inline"
-              >
-                Saved
-              </Link>
+        {/* User Menu */}
+        {!isAuthPage && (
+          <div className="flex items-center gap-4 ml-auto">
+            {user ? (
+              <>
+                {isAdmin ? (
+                  <>
+                    <Link to="/admin/dashboard" className="flex items-center gap-2 text-sm font-semibold hover:text-maroon-200 transition">
+                      🛡️ Admin Dashboard
+                    </Link>
+                    <span className="text-gray-400 text-sm">|</span>
+                    <span className="text-sm">Hi, Admin</span>
+                  </>
+                ) : (
+                  <div className="relative group">
+                    <button className="flex items-center gap-2 hover:text-maroon-200 py-4 transition">
+                      <span>Hi, {user.firstName}</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    
+                    <div className="absolute right-0 mt-0 w-48 bg-white rounded-lg shadow-lg py-1 text-gray-800 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                      <Link to="/favorites" className="block px-4 py-2 hover:bg-gray-100 text-sm flex items-center gap-2">
+                        <span className="text-gray-400">♡</span> Saved
+                      </Link>
+                      
+                      {/* Messages with Unread Badge */}
+                      <Link to="/messages" className="block px-4 py-2 hover:bg-gray-100 text-sm flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">💬</span> Messages
+                        </div>
+                        {count > 0 && (
+                          <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {count}
+                          </span>
+                        )}
+                      </Link>
 
-              <Link
-                to="/messages"
-                className="relative hover:text-maroon-200 transition hidden sm:inline"
-              >
-                Messages
-                {unread > 0 && (
-                  <span className="absolute -top-1.5 -right-3 bg-red-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
-                    {unread}
-                  </span>
+                      <Link to="/orders" className="block px-4 py-2 hover:bg-gray-100 text-sm flex items-center gap-2">
+                        <span className="text-gray-400">📦</span> Orders
+                      </Link>
+                      
+                      {user.roles?.includes("SELLER") && (
+                        <Link to="/seller/dashboard" className="block px-4 py-2 hover:bg-gray-100 text-sm flex items-center gap-2">
+                          <span className="text-gray-400">🏪</span> Seller Dashboard
+                        </Link>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </Link>
 
-              <Link
-                to="/orders"
-                className="hover:text-maroon-200 transition hidden sm:inline"
-              >
-                Orders
-              </Link>
-
-              <span className="text-maroon-200 hidden md:inline">
-                Hi,{" "}
-                <span className="font-semibold text-white">
-                  {user?.firstName}
-                </span>
-              </span>
-
-              {user?.roles?.includes("ADMIN") && (
-                <Link to="/admin" className="hover:text-maroon-200 transition">
-                  Admin
+                <button 
+                  onClick={handleLogout} 
+                  className="bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md transition duration-150 ease-in-out ml-2"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-4">
+                <Link to="/login" className="hover:text-maroon-200 text-sm">Login</Link>
+                <Link to="/register" className="bg-maroon-700 hover:bg-maroon-600 px-4 py-1.5 rounded-lg text-sm font-semibold transition">
+                  Register
                 </Link>
-              )}
-              {user?.roles?.includes("SELLER") && (
-                <Link to="/seller" className="hover:text-maroon-200 transition">
-                  Seller
-                </Link>
-              )}
-              <button
-                onClick={handleLogout}
-                className="bg-maroon-600 hover:bg-maroon-500 px-4 py-1.5 rounded-lg font-semibold transition"
-              >
-                Logout
-              </button>
-            </>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );

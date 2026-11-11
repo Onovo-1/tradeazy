@@ -3,15 +3,18 @@ package com.tradeazy.service;
 import com.tradeazy.dto.request.CreateOrderRequest;
 import com.tradeazy.dto.response.OrderResponse;
 import com.tradeazy.dto.response.PagedResponse;
+import com.tradeazy.entity.Offer;
 import com.tradeazy.entity.Order;
 import com.tradeazy.entity.Product;
 import com.tradeazy.entity.User;
+import com.tradeazy.entity.enums.OfferStatus;
 import com.tradeazy.entity.enums.OrderPaymentStatus;
 import com.tradeazy.entity.enums.OrderStatus;
 import com.tradeazy.entity.enums.ProductStatus;
 import com.tradeazy.exception.ForbiddenException;
 import com.tradeazy.exception.InvalidOperationException;
 import com.tradeazy.exception.ResourceNotFoundException;
+import com.tradeazy.repository.OfferRepository;
 import com.tradeazy.repository.OrderRepository;
 import com.tradeazy.repository.ProductRepository;
 import com.tradeazy.repository.UserRepository;
@@ -34,12 +37,13 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final OfferRepository offerRepository;
     private final PaymentService paymentService;
 
     private static final int MAX_PAGE_SIZE = 100;
 
     // ============================================================
-    // CREATE ORDER (buyer)
+    // CREATE ORDER (buyer, direct purchase)
     // ============================================================
     @Transactional
     public OrderResponse create(Long buyerId, CreateOrderRequest request) {
@@ -69,7 +73,6 @@ public class OrderService {
         BigDecimal unitPrice = product.getEffectivePrice();
         BigDecimal total = unitPrice.multiply(BigDecimal.valueOf(qty));
 
-        // Charge via PaymentService (mock in dev)
         PaymentService.PaymentResult paymentResult = paymentService.charge(
                 buyerId, total, "Order: " + product.getName());
 
@@ -90,7 +93,6 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
 
-        // Reduce stock; mark SOLD if quantity hits 0
         product.setQuantity(product.getQuantity() - qty);
         if (product.getQuantity() == 0) {
             product.setStatus(ProductStatus.SOLD);
@@ -99,6 +101,61 @@ public class OrderService {
 
         log.info("Order created: id={}, buyer={}, product={}, total={}",
                 saved.getId(), buyerId, product.getId(), total);
+
+        return toResponse(saved, buyerId);
+    }
+
+    // ============================================================
+    // CREATE ORDER FROM ACCEPTED OFFER (new)
+    // ============================================================
+    @Transactional
+    public OrderResponse createFromOffer(Long offerId, Long buyerId) {
+        Offer offer = offerRepository.findById(offerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Offer not found"));
+
+        if (!offer.getBuyer().getId().equals(buyerId)) {
+            throw new ForbiddenException("Only the buyer can pay for this offer");
+        }
+        if (offer.getStatus() != OfferStatus.ACCEPTED) {
+            throw new InvalidOperationException("Offer must be accepted before payment");
+        }
+
+        Product product = offer.getProduct();
+        if (product.getStatus() == ProductStatus.SOLD) {
+            throw new InvalidOperationException("Product is already sold");
+        }
+
+        BigDecimal total = offer.getAmount();
+
+        PaymentService.PaymentResult paymentResult = paymentService.charge(
+                buyerId, total, "Accepted Offer: " + product.getName());
+
+        Order order = Order.builder()
+                .buyer(offer.getBuyer())
+                .seller(offer.getSeller())
+                .product(product)
+                .quantity(1)
+                .unitPrice(total)
+                .totalAmount(total)
+                .status(OrderStatus.CONFIRMED)
+                .paymentStatus(paymentResult.success()
+                        ? OrderPaymentStatus.PAID
+                        : OrderPaymentStatus.FAILED)
+                .paymentReference(paymentResult.reference())
+                .notes("From accepted offer #" + offerId)
+                .build();
+
+        Order saved = orderRepository.save(order);
+
+        // Reduce stock
+        product.setQuantity(product.getQuantity() - 1);
+        if (product.getQuantity() == 0) {
+            product.setStatus(ProductStatus.SOLD);
+        }
+        productRepository.save(product);
+
+        log.info("Order created from offer: orderId={}, offerId={}, buyer={}, total={}",
+                saved.getId(), offerId, buyerId, total);
 
         return toResponse(saved, buyerId);
     }
@@ -123,9 +180,6 @@ public class OrderService {
         return toPagedResponse(orders, sellerId);
     }
 
-    // ============================================================
-    // SINGLE order — buyer or seller of that order only
-    // ============================================================
     @Transactional(readOnly = true)
     public OrderResponse get(Long orderId, Long userId) {
         Order order = orderRepository.findById(orderId)
@@ -137,9 +191,6 @@ public class OrderService {
         return toResponse(order, userId);
     }
 
-    // ============================================================
-    // SELLER: update order status
-    // ============================================================
     @Transactional
     public OrderResponse updateStatus(Long orderId, Long sellerId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId)
@@ -156,7 +207,6 @@ public class OrderService {
             throw new InvalidOperationException("Cannot update a cancelled order");
         }
 
-        // Validate transitions
         OrderStatus current = order.getStatus();
         boolean valid = switch (current) {
             case PENDING     -> newStatus == OrderStatus.CONFIRMED || newStatus == OrderStatus.CANCELLED;
@@ -176,9 +226,6 @@ public class OrderService {
         return toResponse(saved, sellerId);
     }
 
-    // ============================================================
-    // BUYER: cancel own order (before seller confirms)
-    // ============================================================
     @Transactional
     public OrderResponse cancel(Long orderId, Long buyerId) {
         Order order = orderRepository.findById(orderId)
@@ -195,7 +242,6 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         Order saved = orderRepository.save(order);
 
-        // Restore stock
         Product product = order.getProduct();
         product.setQuantity(product.getQuantity() + order.getQuantity());
         if (product.getStatus() == ProductStatus.SOLD) {
@@ -235,17 +281,14 @@ public class OrderService {
         Product p = o.getProduct();
         String imageUrl = null;
         try {
-            int size = p.getImages().size();
-            if (size > 0) {
+            if (!p.getImages().isEmpty()) {
                 imageUrl = p.getImages().stream()
                         .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
                         .findFirst()
                         .orElseGet(() -> p.getImages().get(0))
                         .getUrl();
             }
-        } catch (Exception e) {
-            imageUrl = null;
-        }
+        } catch (Exception ignored) {}
 
         User b = o.getBuyer();
         User s = o.getSeller();

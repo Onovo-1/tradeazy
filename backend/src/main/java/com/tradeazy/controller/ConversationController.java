@@ -35,11 +35,12 @@ public class ConversationController {
     @Operation(summary = "List the current user's conversations")
     public ResponseEntity<PagedResponse<ConversationResponse>> list(
             @RequestParam(defaultValue = "false") boolean unread,
+            @RequestParam(required = false) String role,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         Long userId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(conversationService.listForUser(userId, unread, page, size));
+        return ResponseEntity.ok(conversationService.listForUser(userId, unread, role, page, size));
     }
 
     @GetMapping("/{id}")

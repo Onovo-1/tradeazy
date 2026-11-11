@@ -4,22 +4,25 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * A product category (Fashion, Electronics, etc.).
+ * A product category, supporting unlimited nesting via parent/children.
  *
- * Categories are seeded by DataSeeder on startup and can be managed by
- * admins via the admin API. Sellers MUST pick one when creating a product.
+ *   parent = null  →  top-level category (e.g. Fashion)
+ *   parent != null →  sub-category (e.g. Men, Shoes)
  *
- * `slug` is a URL-friendly version of the name (e.g. "Home & Furniture" → "home-furniture").
- * The frontend uses slugs for clean URLs like /category/home-furniture.
+ * Products reference any category (leaf or branch).
  */
 @Entity
 @Table(
     name = "categories",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_categories_name", columnNames = "name"),
         @UniqueConstraint(name = "uk_categories_slug", columnNames = "slug")
+    },
+    indexes = {
+        @Index(name = "idx_categories_parent", columnList = "parent_id")
     }
 )
 @Getter
@@ -36,7 +39,7 @@ public class Category {
     @Column(nullable = false, length = 80)
     private String name;
 
-    @Column(nullable = false, length = 80)
+    @Column(nullable = false, length = 120)
     private String slug;
 
     @Column(length = 255)
@@ -45,6 +48,18 @@ public class Category {
     @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Category parent;
+
+    @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Category> children = new ArrayList<>();
+
+    @OneToMany(mappedBy = "category", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Product> products = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

@@ -1,11 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatNaira } from "../../utils/formatters";
 
 export default function OfferModal({ open, mode, product, baseAmount, onClose, onSubmit }) {
-  const [amount, setAmount] = useState(baseAmount || "");
+  const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Clear the input when the modal is reopened
+  useEffect(() => {
+    if (open) {
+      setAmount("");
+      setNote("");
+      setError(null);
+    }
+  }, [open]);
 
   if (!open) return null;
 
@@ -24,8 +33,6 @@ export default function OfferModal({ open, mode, product, baseAmount, onClose, o
     setSubmitting(true);
     try {
       await onSubmit(numeric, note.trim());
-      setAmount("");
-      setNote("");
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || "Failed to submit offer");
@@ -47,16 +54,15 @@ export default function OfferModal({ open, mode, product, baseAmount, onClose, o
           <div>
             <h2 className="font-bold text-lg">{title}</h2>
             {product && (
-              <p className="text-xs text-maroon-200">
+              <p className="text-xs text-maroon-200 truncate pr-4">
                 About: {product.name}
-                {product.price && ` · asking ${formatNaira(product.price)}`}
               </p>
             )}
           </div>
           <button
             onClick={handleClose}
             disabled={submitting}
-            className="text-white/80 hover:text-white text-2xl leading-none disabled:opacity-50"
+            className="text-white/80 hover:text-white text-2xl leading-none disabled:opacity-50 shrink-0"
           >
             ×
           </button>
@@ -66,6 +72,14 @@ export default function OfferModal({ open, mode, product, baseAmount, onClose, o
           {error && (
             <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
               {error}
+            </div>
+          )}
+
+          {/* The Asking Price Reference */}
+          {baseAmount > 0 && (
+            <div className="bg-maroon-50 border border-maroon-100 rounded-lg p-3 flex justify-between items-center">
+              <span className="text-sm font-medium text-maroon-800">Asking Price:</span>
+              <span className="font-bold text-maroon-900">{formatNaira(baseAmount)}</span>
             </div>
           )}
 
@@ -79,10 +93,10 @@ export default function OfferModal({ open, mode, product, baseAmount, onClose, o
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount"
+              placeholder="Enter your offer"
               disabled={submitting}
               autoFocus
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-maroon-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-maroon-500 placeholder-gray-300"
             />
           </div>
 
@@ -93,7 +107,7 @@ export default function OfferModal({ open, mode, product, baseAmount, onClose, o
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              rows={3}
+              rows={2}
               maxLength={500}
               placeholder="Add a short message"
               disabled={submitting}

@@ -6,15 +6,6 @@ import lombok.*;
 
 import java.math.BigDecimal;
 
-/**
- * Payload for POST/PUT /api/products.
- *
- * Category is referenced by ID (not name) — the frontend fetches the
- * category list first and sends the selected category's ID.
- *
- * Images are NOT part of this DTO — they're uploaded separately via
- * POST /api/products/{id}/images (multipart/form-data).
- */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,8 +17,8 @@ public class ProductRequest {
     @Size(min = 3, max = 150, message = "Product name must be between 3 and 150 characters")
     private String name;
 
-    @NotBlank(message = "Description is required")
-    @Size(min = 10, max = 5000, message = "Description must be between 10 and 5000 characters")
+    // TRULY optional — no NotBlank, no min
+    @Size(max = 5000, message = "Description must be at most 5000 characters")
     private String description;
 
     @NotNull(message = "Price is required")

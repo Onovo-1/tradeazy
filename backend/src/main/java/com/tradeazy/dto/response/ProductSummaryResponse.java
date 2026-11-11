@@ -9,13 +9,6 @@ import java.time.OffsetDateTime;
 
 /**
  * Compact product view for list pages (search results, home page, seller's list).
- *
- * Cheaper than ProductResponse:
- *   - Only the primary image URL, not the full gallery
- *   - Only category name + slug, not the full CategoryResponse
- *   - No specifications, description, or view counts
- *
- * The frontend uses ProductSummaryResponse everywhere it renders a card.
  */
 @Getter
 @Setter
@@ -32,8 +25,11 @@ public class ProductSummaryResponse {
     private ProductCondition condition;
     private ProductStatus status;
     private String location;
+    
+    // ADDED: Quantity so the seller dashboard can display stock
+    private Integer quantity;
 
-    private String primaryImageUrl;      // null if no images
+    private String primaryImageUrl;
     private String categoryName;
     private String categorySlug;
 

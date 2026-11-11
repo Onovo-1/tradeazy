@@ -1,15 +1,13 @@
 import axiosClient from "./axiosClient";
 
 export const subscriptionApi = {
-  me: () => axiosClient.get("/subscriptions/me").then((r) => r.data),
+  getCurrent: () =>
+    axiosClient.get("/subscriptions/me").then((r) => r.data),
 
-  renew: (plan = "MONTHLY") =>
-    axiosClient
-      .post(`/subscriptions/renew?plan=${plan}`)
-      .then((r) => r.data),
+  // Send plan as a QUERY parameter, not a body
+  renew: (plan) =>
+    axiosClient.post(`/subscriptions/renew?plan=${encodeURIComponent(plan)}`).then((r) => r.data),
 
-  history: (params = {}) =>
-    axiosClient.get("/subscriptions/history", { params }).then((r) => r.data),
-
-  prices: () => axiosClient.get("/subscriptions/prices").then((r) => r.data),
+  history: () =>
+    axiosClient.get("/subscriptions/history").then((r) => r.data),
 };

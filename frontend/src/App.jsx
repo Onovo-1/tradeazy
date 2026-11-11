@@ -1,62 +1,92 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { ChatProvider } from "./context/ChatContext";
+
+// Layouts
 import Navbar from "./components/layout/Navbar";
-import Login from "./pages/public/Login";
-import Register from "./pages/public/Register";
+import SellerLayout from "./components/layout/SellerLayout";
+import AdminLayout from "./components/layout/AdminLayout";
+
+// Public Pages
 import Home from "./pages/public/Home";
 import Browse from "./pages/public/Browse";
 import ProductDetails from "./pages/public/ProductDetails";
-import Favorites from "./pages/buyer/Favorites";
-import Messages from "./pages/buyer/Messages";
-import Orders from "./pages/buyer/Orders";
-import SellerLayout from "./components/layout/SellerLayout";
+import Login from "./pages/public/Login";
+import Register from "./pages/public/Register";
+import Favorites from "./pages/public/Favorites";
+import ForgotPassword from "./pages/public/ForgotPassword";
+import ResetPassword from "./pages/public/ResetPassword";
+
+// Seller Pages
 import SellerDashboard from "./pages/seller/SellerDashboard";
 import MyProducts from "./pages/seller/MyProducts";
 import AddProduct from "./pages/seller/AddProduct";
-import Rent from "./pages/seller/Rent";
+import EditProduct from "./pages/seller/EditProduct";
 import SellerOrders from "./pages/seller/SellerOrders";
-import AdminLayout from "./components/layout/AdminLayout";
+import Rent from "./pages/seller/Rent";
+
+// Buyer Pages
+import Messages from "./pages/buyer/Messages";
+import BuyerOrders from "./pages/buyer/Orders";
+
+// Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminProducts from "./pages/admin/AdminProducts";
+
+// Common
 import ProtectedRoute from "./components/common/ProtectedRoute";
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Navbar />
-        <Routes>
-          {/* Public */}
-          <Route path="/" element={<Home />} />
-          <Route path="/browse" element={<Browse />} />
-          <Route path="/products/:id" element={<ProductDetails />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+        <ChatProvider>
+          <Navbar />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/browse" element={<Browse />} />
+            <Route path="/products/:id" element={<ProductDetails />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/favorites" element={<Favorites />} />
 
-          {/* Buyer */}
-          <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
-          <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-          <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+            {/* Protected Buyer Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/messages" element={<Messages />} />
+              <Route path="/orders" element={<BuyerOrders />} />
+            </Route>
 
-          {/* Seller */}
-          <Route path="/seller" element={<ProtectedRoute><SellerLayout /></ProtectedRoute>}>
-            <Route index element={<SellerDashboard />} />
-            <Route path="products" element={<MyProducts />} />
-            <Route path="products/new" element={<AddProduct />} />
-            <Route path="rent" element={<Rent />} />
-            <Route path="orders" element={<SellerOrders />} />
-          </Route>
+            {/* Protected Seller Routes */}
+            <Route element={<ProtectedRoute allowedRoles={["SELLER"]} />}>
+              <Route path="/seller" element={<SellerLayout />}>
+                <Route index element={<Navigate to="/seller/dashboard" replace />} />
+                <Route path="dashboard" element={<SellerDashboard />} />
+                <Route path="products" element={<MyProducts />} />
+                <Route path="products/new" element={<AddProduct />} />
+                <Route path="products/edit/:id" element={<EditProduct />} />
+                <Route path="orders" element={<SellerOrders />} />
+                <Route path="rent" element={<Rent />} />
+              </Route>
+            </Route>
 
-          {/* Admin */}
-          <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="products" element={<AdminProducts />} />
-          </Route>
+            {/* Protected Admin Routes */}
+            <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="products" element={<AdminProducts />} />
+              </Route>
+            </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ChatProvider>
       </AuthProvider>
     </BrowserRouter>
   );

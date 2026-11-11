@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { adminApi } from "../../api/adminApi";
+import ConfirmModal from "../../components/common/ConfirmModal";
 import { formatNaira } from "../../utils/formatters";
 
 const API_ROOT = (
@@ -13,6 +14,14 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
+
+  // Modal state
+  const [modal, setModal] = useState({
+    open: false,
+    type: null, // "remove" | "restore"
+    productId: null,
+    productName: "",
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,30 +41,41 @@ export default function AdminProducts() {
     load();
   }, [load]);
 
-  const handleRemove = async (id) => {
-    if (!confirm("Remove this product from the marketplace?")) return;
-    setBusyId(id);
+  const openModal = (id, name, type) => {
+    setModal({ open: true, productId: id, productName: name, type });
+  };
+
+  const closeModal = () => {
+    if (busyId) return;
+    setModal({ open: false, productId: null, productName: "", type: null });
+  };
+
+  const handleConfirm = async () => {
+    const { productId, type } = modal;
+    setBusyId(productId);
     try {
-      await adminApi.removeProduct(id);
+      if (type === "remove") {
+        await adminApi.removeProduct(productId);
+      } else if (type === "restore") {
+        await adminApi.restoreProduct(productId);
+      }
+      setModal({ open: false, productId: null, productName: "", type: null });
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to remove");
+      alert(err.response?.data?.message || "Failed to update product");
     } finally {
       setBusyId(null);
     }
   };
 
-  const handleRestore = async (id) => {
-    setBusyId(id);
-    try {
-      await adminApi.restoreProduct(id);
-      await load();
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to restore");
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const modalTitle =
+    modal.type === "remove" ? "Remove product?" : "Restore product?";
+  const modalMessage =
+    modal.type === "remove"
+      ? `Are you sure you want to remove "${modal.productName}" from the marketplace? Buyers will no longer see it.`
+      : `Restore "${modal.productName}" back to the marketplace?`;
+  const modalConfirmLabel =
+    modal.type === "remove" ? "Yes, remove" : "Yes, restore";
 
   return (
     <div className="space-y-4">
@@ -143,7 +163,7 @@ export default function AdminProducts() {
                     {p.status !== "REMOVED" ? (
                       <button
                         disabled={busyId === p.id}
-                        onClick={() => handleRemove(p.id)}
+                        onClick={() => openModal(p.id, p.name, "remove")}
                         className="text-xs px-3 py-1.5 border border-red-300 text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
                       >
                         Remove
@@ -151,7 +171,7 @@ export default function AdminProducts() {
                     ) : (
                       <button
                         disabled={busyId === p.id}
-                        onClick={() => handleRestore(p.id)}
+                        onClick={() => openModal(p.id, p.name, "restore")}
                         className="text-xs px-3 py-1.5 border border-green-300 text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
                       >
                         Restore
@@ -164,6 +184,19 @@ export default function AdminProducts() {
           </table>
         </div>
       )}
+
+      {/* Themed Confirm Modal */}
+      <ConfirmModal
+        open={modal.open}
+        title={modalTitle}
+        message={modalMessage}
+        confirmLabel={modalConfirmLabel}
+        cancelLabel="Cancel"
+        tone={modal.type === "remove" ? "danger" : "maroon"}
+        onConfirm={handleConfirm}
+        onCancel={closeModal}
+        busy={busyId !== null}
+      />
     </div>
   );
 }

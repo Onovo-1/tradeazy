@@ -26,12 +26,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Handles account registration and login.
- *
- * Design: returns DTOs, never entities. Business rules are enforced here,
- * NOT in the controller. The controller just translates HTTP ↔ service calls.
- */
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -48,23 +44,9 @@ public class AuthService {
     // ================================================================
     // REGISTER
     // ================================================================
-    /**
-     * Creates a new BUYER or SELLER account.
-     *
-     * Steps:
-     *   1. Reject ADMIN registration.
-     *   2. Check email, username, phone uniqueness.
-     *   3. Hash the password.
-     *   4. Assign the chosen role.
-     *   5. Save.
-     *   6. Return safe user response.
-     *
-     * Transactional so the entire flow is atomic — either all saves succeed or none do.
-     */
     @Transactional
     public UserResponse register(RegisterRequest request) {
 
-        // 1. Nobody can self-register as ADMIN
         if (request.getAccountType() == RoleName.ADMIN) {
             throw new InvalidOperationException("You cannot register as an administrator");
         }
@@ -73,7 +55,6 @@ public class AuthService {
             throw new InvalidOperationException("Invalid account type. Must be BUYER or SELLER");
         }
 
-        // 2. Uniqueness checks — fail fast, before hashing/DB work
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Email is already registered");
         }
@@ -84,16 +65,13 @@ public class AuthService {
             throw new DuplicateResourceException("Phone number is already registered");
         }
 
-        // 3. Fetch the role row. It MUST exist because DataSeeder creates them at startup.
         Role role = roleRepository.findByName(request.getAccountType())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Role not found: " + request.getAccountType()
                 ));
 
-        // 4. Hash the password — NEVER store plaintext
         String hashedPassword = passwordEncoder.encode(request.getPassword());
 
-        // 5. Build the user
         User user = User.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -106,7 +84,6 @@ public class AuthService {
 
         user.addRole(role);
 
-        // 6. Persist + return safe DTO
         User saved = userRepository.save(user);
         return UserMapper.toResponse(saved);
     }
@@ -114,58 +91,78 @@ public class AuthService {
     // ================================================================
     // LOGIN
     // ================================================================
-    /**
-     * Authenticates credentials and returns a JWT.
-     *
-     * Steps:
-     *   1. Delegate password check to Spring Security's AuthenticationManager.
-     *      This uses CustomUserDetailsService + BCryptPasswordEncoder under the hood.
-     *   2. If authentication fails → BadCredentialsException (caught by GlobalExceptionHandler → 401).
-     *   3. Load the actual User entity for token generation (roles needed).
-     *   4. Generate JWT.
-     *   5. Return AuthResponse with token + safe user info.
-     *
-     * Note: `identifier` accepts EITHER email OR username.
-     */
     @Transactional
     public AuthResponse login(LoginRequest request) {
 
-        // 1. Let Spring Security verify credentials.
-        //    This throws BadCredentialsException if wrong, DisabledException if suspended, etc.
         try {
-            Authentication authentication = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getIdentifier(),
                             request.getPassword()
                     )
             );
-            // If we reach here, credentials are valid.
         } catch (BadCredentialsException ex) {
-            // Re-throw as our own exception so GlobalExceptionHandler returns a clean 401
             throw new UnauthorizedException("Invalid email/username or password");
         }
 
-        // 2. Load the entity — needed for JWT (roles) and AuthResponse (id, names, etc.)
         User user = userRepository.findByEmailOrUsername(request.getIdentifier())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "User not found: " + request.getIdentifier()
                 ));
 
-        // 3. Suspended users can't log in even if password is right.
-        //    (Spring's isEnabled() also blocks this, but explicit check keeps the message clear.)
         if (user.getStatus() == UserStatus.SUSPENDED) {
             throw new UnauthorizedException("Your account has been suspended. Contact support.");
         }
 
-        // 4. Generate the JWT
         String token = jwtService.generateToken(user);
 
-        // 5. Build response
         return AuthResponse.builder()
                 .token(token)
                 .tokenType("Bearer")
-                .expiresIn(jwtExpirationMs / 1000)   // convert ms → seconds
+                .expiresIn(jwtExpirationMs / 1000)
                 .user(UserMapper.toResponse(user))
                 .build();
+    }
+
+    // ================================================================
+    // PASSWORD RESET (NEW)
+    // ================================================================
+    @Transactional
+    public void requestPasswordReset(String email) {
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            // Don't reveal if email exists (security best practice)
+            System.out.println(">>> Password reset requested for non-existent email: " + email);
+            return;
+        }
+
+        // Generate random token
+        String token = UUID.randomUUID().toString();
+
+        // Save token in the password field (temporary hack - for real prod, add a reset_token column)
+        user.setPassword("RESET:" + token);
+        userRepository.save(user);
+
+        // Print reset link to backend console for dev testing
+        String resetLink = "http://localhost:5173/reset-password?token=" + token;
+        System.out.println("================================================================");
+        System.out.println(">>> PASSWORD RESET LINK for " + email);
+        System.out.println(">>> " + resetLink);
+        System.out.println("================================================================");
+    }
+
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        // Find user whose password field starts with RESET: followed by the token
+        String match = "RESET:" + token;
+        User user = userRepository.findAll().stream()
+                .filter(u -> u.getPassword() != null && u.getPassword().equals(match))
+                .findFirst()
+                .orElseThrow(() -> new InvalidOperationException("Invalid or expired reset token"));
+
+        // Hash new password and save
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        System.out.println(">>> Password reset for user: " + user.getUsername());
     }
 }

@@ -12,7 +12,7 @@ export default function Register() {
     lastName: "",
     username: "",
     email: "",
-    phone: "",
+    phone: "", 
     password: "",
     confirmPassword: "",
     accountType: "BUYER",
@@ -21,16 +21,67 @@ export default function Register() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  const handleChange = (e) =>
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "firstName" || name === "lastName") {
+      const sanitizedValue = value.replace(/[^a-zA-Z\s'-]/g, "");
+      setForm((f) => ({ ...f, [name]: sanitizedValue.slice(0, 25) }));
+      return;
+    }
+
+    if (name === "phone") {
+      let rawValue = value.replace(/\D/g, ""); 
+      if (rawValue.length > 11) rawValue = rawValue.slice(0, 11);
+
+      // Strict Rules for Nigerian Numbers:
+      // 1st digit: 0
+      // 2nd digit: 7, 8, 9
+      // 3rd digit: 0, 1
+      
+      if (rawValue.length >= 1 && rawValue[0] !== "0") {
+        return; // Stop if first isn't 0
+      }
+      if (rawValue.length >= 2 && !["7", "8", "9"].includes(rawValue[1])) {
+        return; // Stop if second isn't 7, 8, or 9
+      }
+      if (rawValue.length >= 3 && !["0", "1"].includes(rawValue[2])) {
+        return; // Stop if third isn't 0 or 1
+      }
+
+      setForm((f) => ({ ...f, phone: rawValue }));
+      return;
+    }
+
+    setForm((f) => ({ ...f, [name]: value }));
+  };
+
+  const isValidEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
+    
+    if (!isValidEmail(form.email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (form.phone.length !== 11) {
+      setError("Please enter a valid 11-digit phone number.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await register(form);
+      // Temporarily prefix +234 for the backend validation if it still expects it
+      // Remove this if you updated the backend to accept 11-digit numbers
+      const payload = { ...form, phone: `+234${form.phone.substring(1)}` };
+      
+      await register(payload);
       navigate("/", { replace: true });
     } catch (err) {
       const data = err.response?.data;
@@ -67,132 +118,8 @@ export default function Register() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                First name
-              </label>
-              <input
-                type="text"
-                name="firstName"
-                value={form.firstName}
-                onChange={handleChange}
-                required
-                className={inputClass("firstName")}
-              />
-              {fieldErrors.firstName && (
-                <p className="text-xs text-red-600 mt-1">{fieldErrors.firstName}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last name
-              </label>
-              <input
-                type="text"
-                name="lastName"
-                value={form.lastName}
-                onChange={handleChange}
-                required
-                className={inputClass("lastName")}
-              />
-              {fieldErrors.lastName && (
-                <p className="text-xs text-red-600 mt-1">{fieldErrors.lastName}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Username
-            </label>
-            <input
-              type="text"
-              name="username"
-              value={form.username}
-              onChange={handleChange}
-              required
-              className={inputClass("username")}
-            />
-            {fieldErrors.username && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.username}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              required
-              className={inputClass("email")}
-            />
-            {fieldErrors.email && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone
-            </label>
-            <input
-              type="text"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              required
-              placeholder="+2348012345678"
-              className={inputClass("phone")}
-            />
-            {fieldErrors.phone && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <PasswordInput
-                name="password"
-                value={form.password}
-                onChange={handleChange}
-                required
-                autoComplete="new-password"
-              />
-              {fieldErrors.password && (
-                <p className="text-xs text-red-600 mt-1">{fieldErrors.password}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm password
-              </label>
-              <PasswordInput
-                name="confirmPassword"
-                value={form.confirmPassword}
-                onChange={handleChange}
-                required
-                autoComplete="new-password"
-              />
-              {fieldErrors.confirmPassword && (
-                <p className="text-xs text-red-600 mt-1">
-                  {fieldErrors.confirmPassword}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              I want to join as a
-            </label>
+          
+          <div className="mb-6">
             <div className="grid grid-cols-2 gap-3">
               {["BUYER", "SELLER"].map((type) => (
                 <label
@@ -217,10 +144,117 @@ export default function Register() {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                First name
+              </label>
+              <input
+                type="text"
+                name="firstName"
+                value={form.firstName}
+                onChange={handleChange}
+                required
+                className={inputClass("firstName")}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Last name
+              </label>
+              <input
+                type="text"
+                name="lastName"
+                value={form.lastName}
+                onChange={handleChange}
+                required
+                className={inputClass("lastName")}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Username
+            </label>
+            <input
+              type="text"
+              name="username"
+              value={form.username}
+              onChange={handleChange}
+              required
+              className={inputClass("username")}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              required
+              placeholder="you@example.com"
+              className={`${inputClass("email")} ${
+                form.email && !isValidEmail(form.email) ? "border-red-400" : ""
+              }`}
+            />
+            {form.email && !isValidEmail(form.email) && (
+              <p className="text-xs text-red-600 mt-1">Invalid email format</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number
+            </label>
+            <input
+              type="text"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              required
+              maxLength="11"
+              placeholder="e.g. 08012345678"
+              className={inputClass("phone")}
+            />
+            {/* The error message under the input is completely removed */}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <PasswordInput
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                required
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm password
+              </label>
+              <PasswordInput
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                required
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-maroon-700 hover:bg-maroon-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition"
+            className="w-full bg-maroon-700 hover:bg-maroon-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition mt-6"
           >
             {submitting ? "Creating account..." : "Create account"}
           </button>

@@ -4,6 +4,7 @@ import com.tradeazy.dto.response.ConversationResponse;
 import com.tradeazy.dto.response.PagedResponse;
 import com.tradeazy.entity.Conversation;
 import com.tradeazy.entity.Message;
+import com.tradeazy.entity.Offer;
 import com.tradeazy.entity.Product;
 import com.tradeazy.entity.User;
 import com.tradeazy.exception.ForbiddenException;
@@ -11,6 +12,7 @@ import com.tradeazy.exception.InvalidOperationException;
 import com.tradeazy.exception.ResourceNotFoundException;
 import com.tradeazy.repository.ConversationRepository;
 import com.tradeazy.repository.MessageRepository;
+import com.tradeazy.repository.OfferRepository;
 import com.tradeazy.repository.ProductRepository;
 import com.tradeazy.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,15 +32,13 @@ public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
+    private final OfferRepository offerRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final int PREVIEW_LENGTH = 60;
 
-    // ============================================================
-    // START (or return existing) conversation for a product
-    // ============================================================
     @Transactional
     public ConversationResponse start(Long buyerId, Long productId) {
         Product product = productRepository.findById(productId)
@@ -72,19 +72,16 @@ public class ConversationService {
                 });
     }
 
-    // ============================================================
-    // LIST for user — all or unread-only
-    // ============================================================
     @Transactional(readOnly = true)
     public PagedResponse<ConversationResponse> listForUser(
-            Long userId, boolean unreadOnly, int page, int size) {
+            Long userId, boolean unreadOnly, String roleFilter, int page, int size) {
         int safePage = Math.max(0, page);
         int safeSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
         Pageable pageable = PageRequest.of(safePage, safeSize);
 
         Page<Conversation> conversations = unreadOnly
-                ? conversationRepository.findUnreadForUser(userId, pageable)
-                : conversationRepository.findAllForUser(userId, pageable);
+                ? conversationRepository.findUnreadForUser(userId, roleFilter, pageable)
+                : conversationRepository.findAllForUser(userId, roleFilter, pageable);
 
         List<ConversationResponse> content = conversations.getContent().stream()
                 .map(c -> toResponse(c, userId))
@@ -100,9 +97,6 @@ public class ConversationService {
                 .build();
     }
 
-    // ============================================================
-    // SINGLE conversation
-    // ============================================================
     @Transactional(readOnly = true)
     public ConversationResponse get(Long conversationId, Long userId) {
         Conversation conversation = conversationRepository.findById(conversationId)
@@ -113,17 +107,11 @@ public class ConversationService {
         return toResponse(conversation, userId);
     }
 
-    // ============================================================
-    // UNREAD COUNT (navbar badge)
-    // ============================================================
     @Transactional(readOnly = true)
     public long countUnread(Long userId) {
         return conversationRepository.countUnreadForUser(userId);
     }
 
-    // ============================================================
-    // MARK READ
-    // ============================================================
     @Transactional
     public void markRead(Long conversationId, Long userId) {
         Conversation conversation = conversationRepository.findById(conversationId)
@@ -138,9 +126,6 @@ public class ConversationService {
         }
     }
 
-    // ============================================================
-    // Helpers
-    // ============================================================
     public boolean isParticipant(Conversation c, Long userId) {
         return c.getBuyer().getId().equals(userId) || c.getSeller().getId().equals(userId);
     }
@@ -153,6 +138,10 @@ public class ConversationService {
                 .findFirstByConversationIdOrderByCreatedAtDesc(c.getId())
                 .orElse(null);
 
+        Offer lastOffer = offerRepository
+                .findFirstByConversationIdAndStatusOrderByCreatedAtDesc(c.getId(), com.tradeazy.entity.enums.OfferStatus.PENDING)
+                .orElse(null);
+
         long unread = messageRepository.countUnreadInConversation(c.getId(), currentUserId);
 
         String preview = null;
@@ -161,9 +150,12 @@ public class ConversationService {
             preview = content.length() > PREVIEW_LENGTH
                     ? content.substring(0, PREVIEW_LENGTH) + "…"
                     : content;
+        } else if (lastOffer != null) {
+            preview = "💰 Offer: ₦" + lastOffer.getAmount();
         }
 
         Product p = c.getProduct();
+        
         String productImageUrl = null;
         if (p.getImages() != null && !p.getImages().isEmpty()) {
             productImageUrl = p.getImages().stream()
@@ -177,6 +169,7 @@ public class ConversationService {
                 .id(c.getId())
                 .productId(p.getId())
                 .productName(p.getName())
+                .productPrice(p.getPrice()) // <--- THIS IS THE NEW LINE
                 .productImageUrl(productImageUrl)
                 .peerId(peer.getId())
                 .peerUsername(peer.getUsername())

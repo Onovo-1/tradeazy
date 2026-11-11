@@ -20,10 +20,18 @@ public class RegisterRequest {
 
     @NotBlank(message = "First name is required")
     @Size(max = 60, message = "First name must be at most 60 characters")
+    @Pattern(
+        regexp = "^[a-zA-Z\\s'-]+$",
+        message = "First name can only contain letters, spaces, hyphens, and apostrophes"
+    )
     private String firstName;
 
     @NotBlank(message = "Last name is required")
     @Size(max = 60, message = "Last name must be at most 60 characters")
+    @Pattern(
+        regexp = "^[a-zA-Z\\s'-]+$",
+        message = "Last name can only contain letters, spaces, hyphens, and apostrophes"
+    )
     private String lastName;
 
     @NotBlank(message = "Username is required")
@@ -39,10 +47,11 @@ public class RegisterRequest {
     @Size(max = 120, message = "Email must be at most 120 characters")
     private String email;
 
+    // This is the updated phone validation that strictly requires +234 followed by 10 digits
     @NotBlank(message = "Phone number is required")
     @Pattern(
-        regexp = "^\\+?[0-9]{7,15}$",
-        message = "Phone number must be 7-15 digits, optionally starting with +"
+        regexp = "^\\+234[0-9]{10}$",
+        message = "Phone number must be in the format +234XXXXXXXXXX (10 digits after +234)"
     )
     private String phone;
 

@@ -1,6 +1,5 @@
 package com.tradeazy.mapper;
 
-import com.tradeazy.dto.response.CategoryResponse;
 import com.tradeazy.dto.response.ProductImageResponse;
 import com.tradeazy.dto.response.ProductResponse;
 import com.tradeazy.dto.response.ProductSummaryResponse;
@@ -66,6 +65,7 @@ public final class ProductMapper {
                 .condition(product.getCondition())
                 .status(product.getStatus())
                 .location(product.getLocation())
+                .quantity(product.getQuantity()) // <--- ADDED THIS
                 .primaryImageUrl(findPrimaryImageUrl(product.getImages()))
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
                 .categorySlug(product.getCategory() != null ? product.getCategory().getSlug() : null)
@@ -94,10 +94,6 @@ public final class ProductMapper {
                 .toList();
     }
 
-    /**
-     * Returns the primary image URL, or the first image if none is marked primary.
-     * Returns null if there are no images at all.
-     */
     private static String findPrimaryImageUrl(List<ProductImage> images) {
         if (images == null || images.isEmpty()) return null;
         return images.stream()

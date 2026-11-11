@@ -10,12 +10,12 @@ import java.time.OffsetDateTime;
 @AllArgsConstructor
 @Builder
 public class MessageResponse {
-
     private Long id;
     private Long conversationId;
     private Long senderId;
     private String senderUsername;
+    private String senderFirstName;
     private String content;
-    private Boolean read;
+    private boolean read;
     private OffsetDateTime createdAt;
 }

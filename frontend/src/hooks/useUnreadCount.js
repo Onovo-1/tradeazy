@@ -2,11 +2,6 @@ import { useEffect, useState } from "react";
 import { chatApi } from "../api/chatApi";
 import { useAuth } from "../context/AuthContext";
 
-/**
- * Returns the number of conversations with unread messages.
- * Polls every 20s while the user is authenticated.
- * Returns 0 when unauthenticated.
- */
 export function useUnreadCount() {
   const { isAuthenticated } = useAuth();
   const [count, setCount] = useState(0);
@@ -22,9 +17,15 @@ export function useUnreadCount() {
       chatApi
         .unreadCount()
         .then((r) => {
-          if (!cancelled) setCount(r.unreadConversations ?? 0);
+          if (!cancelled) {
+            // Log to verify the response structure
+            console.log("Unread count response:", r); 
+            setCount(r.unreadConversations ?? 0);
+          }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error("Failed to fetch unread count:", err.response?.data || err.message);
+        });
     };
 
     fetchCount();
@@ -35,5 +36,5 @@ export function useUnreadCount() {
     };
   }, [isAuthenticated]);
 
-  return count;
+  return { count };
 }

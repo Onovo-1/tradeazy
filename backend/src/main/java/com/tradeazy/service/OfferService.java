@@ -6,6 +6,7 @@ import com.tradeazy.dto.response.OfferResponse;
 import com.tradeazy.entity.Conversation;
 import com.tradeazy.entity.Offer;
 import com.tradeazy.entity.User;
+import com.tradeazy.entity.enums.NotificationType;
 import com.tradeazy.entity.enums.OfferStatus;
 import com.tradeazy.exception.ForbiddenException;
 import com.tradeazy.exception.InvalidOperationException;
@@ -28,11 +29,8 @@ public class OfferService {
     private final OfferRepository offerRepository;
     private final ConversationRepository conversationRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
-    /**
-     * Computes the role of whoever made this offer based on the parent chain.
-     * Even depth (0, 2, 4...) = BUYER. Odd depth = SELLER.
-     */
     private String roleOf(Offer o) {
         int depth = 0;
         Offer cursor = o;
@@ -43,19 +41,16 @@ public class OfferService {
         return (depth % 2 == 0) ? "BUYER" : "SELLER";
     }
 
-    // ============================================================
-    // CREATE — buyer makes an offer
-    // ============================================================
     @Transactional
     public OfferResponse create(Long buyerId, OfferRequest request) {
         Conversation conversation = conversationRepository.findById(request.getConversationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
-        // Force eager load
         conversation.getBuyer().getId();
         conversation.getSeller().getId();
         conversation.getProduct().getId();
         conversation.getProduct().getName();
+        conversation.getProduct().getPrice();
 
         if (!conversation.getBuyer().getId().equals(buyerId)) {
             throw new ForbiddenException("Only the buyer can make an offer in this conversation");
@@ -63,10 +58,9 @@ public class OfferService {
 
         Offer existing = offerRepository
                 .findFirstByConversationIdAndStatusOrderByCreatedAtDesc(
-                        conversation.getId(), OfferStatus.PENDING);
+                        conversation.getId(), OfferStatus.PENDING).orElse(null);
         if (existing != null) {
-            throw new InvalidOperationException(
-                    "There is already a pending offer in this conversation");
+            throw new InvalidOperationException("There is already a pending offer in this conversation");
         }
 
         User buyer = userRepository.findById(buyerId)
@@ -85,29 +79,127 @@ public class OfferService {
         Offer saved = offerRepository.save(offer);
         log.info("Offer created: id={}, conv={}, buyer={}, amount={}",
                 saved.getId(), conversation.getId(), buyerId, request.getAmount());
+
+        notificationService.notify(
+                conversation.getSeller().getId(),
+                buyerId,
+                NotificationType.NEW_OFFER,
+                "New offer received",
+                buyer.getFirstName() + " offered ₦" + request.getAmount() + " for " + conversation.getProduct().getName(),
+                saved.getId(),
+                "/messages?c=" + conversation.getId()
+        );
+
         return toResponse(saved, buyerId);
     }
 
-    // ============================================================
-    // ACCEPT — the counterparty of the last offer accepts
-    // ============================================================
+    @Transactional
+    public OfferResponse createBuyNowOffer(Long conversationId, Long buyerId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        var product = conversation.getProduct();
+        var effectivePrice = product.getEffectivePrice();
+        var productName = product.getName();
+        var seller = conversation.getSeller();
+        var buyer = conversation.getBuyer();
+
+        if (!buyer.getId().equals(buyerId)) {
+            throw new ForbiddenException("Only the buyer can make an offer in this conversation");
+        }
+
+        Offer existing = offerRepository
+                .findFirstByConversationIdAndStatusOrderByCreatedAtDesc(
+                        conversation.getId(), OfferStatus.PENDING).orElse(null);
+        if (existing != null) {
+            throw new InvalidOperationException("There is already a pending offer in this conversation");
+        }
+
+        Offer offer = Offer.builder()
+                .conversation(conversation)
+                .product(product)
+                .buyer(buyer)
+                .seller(seller)
+                .amount(effectivePrice)
+                .note("I want to buy this at full price.")
+                .status(OfferStatus.PENDING)
+                .build();
+
+        Offer saved = offerRepository.save(offer);
+        log.info("Buy Now Offer created: id={}, conv={}, buyer={}, amount={}",
+                saved.getId(), conversation.getId(), buyerId, saved.getAmount());
+
+        notificationService.notify(
+                seller.getId(),
+                buyerId,
+                NotificationType.NEW_OFFER,
+                "Buy request received",
+                buyer.getFirstName() + " wants to buy " + productName + " for " + effectivePrice,
+                saved.getId(),
+                "/messages?c=" + conversation.getId()
+        );
+
+        return toResponse(saved, buyerId);
+    }
+
+    @Transactional
+    public OfferResponse update(Long offerId, Long userId, java.math.BigDecimal newAmount, String newNote) {
+        Offer offer = offerRepository.findById(offerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Offer not found"));
+
+        boolean isBuyer = offer.getBuyer().getId().equals(userId);
+        boolean isSeller = offer.getSeller().getId().equals(userId);
+
+        if (!isBuyer && !isSeller) {
+            throw new ForbiddenException("You are not part of this offer");
+        }
+
+        if (offer.getStatus() != OfferStatus.PENDING) {
+            throw new InvalidOperationException("Only pending offers can be edited");
+        }
+
+        offer.setAmount(newAmount);
+        offer.setNote(newNote);
+        
+        Offer saved = offerRepository.save(offer);
+        log.info("Offer {} updated by user {} to amount {}", offerId, userId, newAmount);
+
+        return toResponse(saved, userId);
+    }
+
+    @Transactional
+    public void delete(Long offerId, Long userId) {
+        Offer offer = offerRepository.findById(offerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Offer not found"));
+
+        boolean isBuyer = offer.getBuyer().getId().equals(userId);
+        boolean isSeller = offer.getSeller().getId().equals(userId);
+
+        if (!isBuyer && !isSeller) {
+            throw new ForbiddenException("You are not part of this offer");
+        }
+
+        if (offer.getStatus() != OfferStatus.PENDING) {
+            throw new InvalidOperationException("Only pending offers can be deleted");
+        }
+
+        offerRepository.delete(offer);
+        log.info("Offer {} deleted by user {}", offerId, userId);
+    }
+
     @Transactional
     public OfferResponse accept(Long offerId, Long userId) {
         Offer offer = loadParticipant(offerId, userId);
 
         if (offer.getStatus() != OfferStatus.PENDING) {
-            throw new InvalidOperationException(
-                    "This offer is not pending; it's " + offer.getStatus().name());
+            throw new InvalidOperationException("This offer is not pending; it's " + offer.getStatus().name());
         }
 
-        String makerRole = roleOf(offer); // "BUYER" or "SELLER"
+        String makerRole = roleOf(offer);
         boolean amBuyer = offer.getBuyer().getId().equals(userId);
         boolean amSeller = offer.getSeller().getId().equals(userId);
 
-        // The counterparty is whoever did NOT make the offer
-        boolean amCounterparty =
-                (makerRole.equals("BUYER") && amSeller) ||
-                (makerRole.equals("SELLER") && amBuyer);
+        boolean amCounterparty = (makerRole.equals("BUYER") && amSeller) || (makerRole.equals("SELLER") && amBuyer);
 
         if (!amCounterparty) {
             throw new ForbiddenException("You cannot accept your own offer");
@@ -116,28 +208,35 @@ public class OfferService {
         offer.setStatus(OfferStatus.ACCEPTED);
         Offer saved = offerRepository.save(offer);
         log.info("Offer {} accepted by user {} (role: {})", offerId, userId, amBuyer ? "BUYER" : "SELLER");
+
+        Long recipientId = makerRole.equals("BUYER") ? offer.getBuyer().getId() : offer.getSeller().getId();
+
+        notificationService.notify(
+                recipientId,
+                userId,
+                NotificationType.OFFER_ACCEPTED,
+                "Offer accepted",
+                "Your offer of ₦" + offer.getAmount() + " was accepted.",
+                offer.getId(),
+                "/messages?c=" + offer.getConversation().getId()
+        );
+
         return toResponse(saved, userId);
     }
 
-    // ============================================================
-    // REJECT
-    // ============================================================
     @Transactional
     public OfferResponse reject(Long offerId, Long userId) {
         Offer offer = loadParticipant(offerId, userId);
 
         if (offer.getStatus() != OfferStatus.PENDING) {
-            throw new InvalidOperationException(
-                    "This offer is not pending; it's " + offer.getStatus().name());
+            throw new InvalidOperationException("This offer is not pending; it's " + offer.getStatus().name());
         }
 
         String makerRole = roleOf(offer);
         boolean amBuyer = offer.getBuyer().getId().equals(userId);
         boolean amSeller = offer.getSeller().getId().equals(userId);
 
-        boolean amCounterparty =
-                (makerRole.equals("BUYER") && amSeller) ||
-                (makerRole.equals("SELLER") && amBuyer);
+        boolean amCounterparty = (makerRole.equals("BUYER") && amSeller) || (makerRole.equals("SELLER") && amBuyer);
 
         if (!amCounterparty) {
             throw new ForbiddenException("You cannot reject your own offer");
@@ -146,12 +245,22 @@ public class OfferService {
         offer.setStatus(OfferStatus.REJECTED);
         Offer saved = offerRepository.save(offer);
         log.info("Offer {} rejected by user {}", offerId, userId);
+
+        Long recipientId = makerRole.equals("BUYER") ? offer.getBuyer().getId() : offer.getSeller().getId();
+
+        notificationService.notify(
+                recipientId,
+                userId,
+                NotificationType.OFFER_REJECTED,
+                "Offer rejected",
+                "Your offer of ₦" + offer.getAmount() + " was rejected.",
+                offer.getId(),
+                "/messages?c=" + offer.getConversation().getId()
+        );
+
         return toResponse(saved, userId);
     }
 
-    // ============================================================
-    // COUNTER — counterparty counters a pending offer
-    // ============================================================
     @Transactional
     public OfferResponse counter(Long parentOfferId, Long userId, CounterOfferRequest request) {
         Offer parent = loadParticipant(parentOfferId, userId);
@@ -164,19 +273,15 @@ public class OfferService {
         boolean amBuyer = parent.getBuyer().getId().equals(userId);
         boolean amSeller = parent.getSeller().getId().equals(userId);
 
-        boolean amCounterparty =
-                (makerRole.equals("BUYER") && amSeller) ||
-                (makerRole.equals("SELLER") && amBuyer);
+        boolean amCounterparty = (makerRole.equals("BUYER") && amSeller) || (makerRole.equals("SELLER") && amBuyer);
 
         if (!amCounterparty) {
             throw new ForbiddenException("You cannot counter your own offer");
         }
 
-        // Close the parent
         parent.setStatus(OfferStatus.COUNTERED);
         offerRepository.save(parent);
 
-        // Create the counter
         Offer counter = Offer.builder()
                 .conversation(parent.getConversation())
                 .product(parent.getProduct())
@@ -191,18 +296,27 @@ public class OfferService {
         Offer saved = offerRepository.save(counter);
         log.info("Counter offer {} created from parent {} by user {} (role: {})",
                 saved.getId(), parentOfferId, userId, amBuyer ? "BUYER" : "SELLER");
+
+        Long recipientId = amBuyer ? parent.getSeller().getId() : parent.getBuyer().getId();
+
+        notificationService.notify(
+                recipientId,
+                userId,
+                NotificationType.OFFER_COUNTERED,
+                "Counter offer received",
+                "You received a counter offer of ₦" + request.getAmount() + ".",
+                saved.getId(),
+                "/messages?c=" + parent.getConversation().getId()
+        );
+
         return toResponse(saved, userId);
     }
 
-    // ============================================================
-    // LIST
-    // ============================================================
     @Transactional(readOnly = true)
     public List<OfferResponse> listByConversation(Long conversationId, Long userId) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
-        if (!conversation.getBuyer().getId().equals(userId)
-                && !conversation.getSeller().getId().equals(userId)) {
+        if (!conversation.getBuyer().getId().equals(userId) && !conversation.getSeller().getId().equals(userId)) {
             throw new ForbiddenException("You are not part of this conversation");
         }
         return offerRepository.findByConversationIdOrderByCreatedAtDesc(conversationId)
@@ -211,9 +325,6 @@ public class OfferService {
                 .toList();
     }
 
-    // ============================================================
-    // Helpers
-    // ============================================================
     private Offer loadParticipant(Long offerId, Long userId) {
         Offer offer = offerRepository.findById(offerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Offer not found: " + offerId));
@@ -221,8 +332,7 @@ public class OfferService {
         offer.getSeller().getId();
         offer.getProduct().getId();
         offer.getConversation().getId();
-        if (!offer.getBuyer().getId().equals(userId)
-                && !offer.getSeller().getId().equals(userId)) {
+        if (!offer.getBuyer().getId().equals(userId) && !offer.getSeller().getId().equals(userId)) {
             throw new ForbiddenException("You are not part of this offer");
         }
         return offer;

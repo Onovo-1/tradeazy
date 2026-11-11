@@ -34,6 +34,8 @@ export default function AdminDashboard() {
     );
   }
 
+  if (!stats) return null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -41,7 +43,6 @@ export default function AdminDashboard() {
         <p className="text-sm text-gray-500">Platform-wide statistics</p>
       </div>
 
-      {/* Users */}
       <Section title="Users">
         <StatCard label="Total Users" value={stats.totalUsers} />
         <StatCard label="Buyers" value={stats.totalBuyers} color="text-green-700" />
@@ -49,7 +50,6 @@ export default function AdminDashboard() {
         <StatCard label="Admins" value={stats.totalAdmins} color="text-gray-600" />
       </Section>
 
-      {/* Products */}
       <Section title="Products">
         <StatCard label="Total" value={stats.totalProducts} />
         <StatCard label="Active" value={stats.activeProducts} color="text-green-700" />
@@ -57,7 +57,6 @@ export default function AdminDashboard() {
         <StatCard label="Removed" value={stats.removedProducts} color="text-gray-400" />
       </Section>
 
-      {/* Orders */}
       <Section title="Orders & Revenue">
         <StatCard label="Total Orders" value={stats.totalOrders} />
         <StatCard label="Pending" value={stats.pendingOrders} color="text-yellow-700" />
@@ -70,7 +69,6 @@ export default function AdminDashboard() {
         />
       </Section>
 
-      {/* Subscriptions */}
       <Section title="Subscriptions (Rent)">
         <StatCard label="Active" value={stats.activeSubscriptions} color="text-green-700" />
         <StatCard label="Expired" value={stats.expiredSubscriptions} color="text-gray-500" />
@@ -80,18 +78,14 @@ export default function AdminDashboard() {
           color="text-maroon-800"
           isText
         />
-        <StatCard label="Total Rent Collected" value="" hidden />
       </Section>
 
-      {/* Engagement */}
       <Section title="Engagement">
         <StatCard label="Conversations" value={stats.totalConversations} />
         <StatCard label="Offers" value={stats.totalOffers} />
         <StatCard label="Favorites" value={stats.totalFavorites} />
-        <StatCard label="" value="" hidden />
       </Section>
 
-      {/* Quick links */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="font-semibold text-gray-900 mb-4">Quick actions</h2>
         <div className="flex flex-wrap gap-3">
@@ -122,13 +116,12 @@ function Section({ title, children }) {
   );
 }
 
-function StatCard({ label, value, color = "text-gray-900", isText = false, hidden = false }) {
-  if (hidden) return null;
+function StatCard({ label, value, color = "text-gray-900", isText = false }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       <p className="text-xs uppercase text-gray-400 font-bold mb-1">{label}</p>
       <p className={`${isText ? "text-xl" : "text-3xl"} font-extrabold ${color}`}>
-        {value}
+        {value ?? 0}
       </p>
     </div>
   );

@@ -7,6 +7,7 @@ import com.tradeazy.dto.response.UserResponse;
 import com.tradeazy.entity.Product;
 import com.tradeazy.entity.User;
 import com.tradeazy.entity.enums.OrderStatus;
+import com.tradeazy.entity.enums.OrderPaymentStatus;
 import com.tradeazy.entity.enums.ProductStatus;
 import com.tradeazy.entity.enums.RoleName;
 import com.tradeazy.entity.enums.SubscriptionStatus;

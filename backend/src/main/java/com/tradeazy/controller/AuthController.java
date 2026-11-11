@@ -4,8 +4,6 @@ import com.tradeazy.dto.request.LoginRequest;
 import com.tradeazy.dto.request.RegisterRequest;
 import com.tradeazy.dto.response.AuthResponse;
 import com.tradeazy.dto.response.UserResponse;
-import com.tradeazy.entity.User;
-import com.tradeazy.mapper.UserMapper;
 import com.tradeazy.security.SecurityUtils;
 import com.tradeazy.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,50 +14,53 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Authentication endpoints.
- *
- * Thin controller: HTTP concerns only (paths, status codes, validation trigger).
- * Business logic lives in AuthService.
- */
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@Tag(name = "Authentication", description = "Register, login, and get current user")
+@Tag(name = "Authentication", description = "Register, login, and password reset")
 public class AuthController {
 
     private final AuthService authService;
 
-    // ------------------------------------------------------------
-    // POST /api/auth/register
-    // ------------------------------------------------------------
     @PostMapping("/register")
-    @Operation(summary = "Register a new buyer or seller account")
+    @Operation(summary = "Register a new user")
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
-        UserResponse created = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     }
 
-    // ------------------------------------------------------------
-    // POST /api/auth/login
-    // ------------------------------------------------------------
     @PostMapping("/login")
-    @Operation(summary = "Login with email or username; returns JWT")
+    @Operation(summary = "Log in and get a JWT")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(authService.login(request));
     }
 
-    // ------------------------------------------------------------
-    // GET /api/auth/me
-    // Requires valid JWT (Authorization: Bearer <token>)
-    // ------------------------------------------------------------
     @GetMapping("/me")
-    @Operation(summary = "Return the currently authenticated user")
+    @Operation(summary = "Get current user profile")
     public ResponseEntity<UserResponse> me() {
-        // SecurityUtils reads the current user from the JWT-populated SecurityContext.
-        // Never trusts any ID from the request — the JWT is the source of truth.
-        User currentUser = SecurityUtils.getCurrentUser();
-        return ResponseEntity.ok(UserMapper.toResponse(currentUser));
+        Long userId = SecurityUtils.getCurrentUserId();
+        return ResponseEntity.ok(authService.getProfile(userId));
+    }
+
+    // NEW: Request a password reset (generate token)
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Request a password reset link")
+    public ResponseEntity<Map<String, String>> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        authService.requestPasswordReset(email);
+        return ResponseEntity.ok(Map.of(
+            "message", "If an account with that email exists, a reset link has been sent."
+        ));
+    }
+
+    // NEW: Reset the password using a token
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password with a token")
+    public ResponseEntity<Map<String, String>> resetPassword(@RequestBody Map<String, String> body) {
+        String token = body.get("token");
+        String newPassword = body.get("newPassword");
+        authService.resetPassword(token, newPassword);
+        return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
     }
 }

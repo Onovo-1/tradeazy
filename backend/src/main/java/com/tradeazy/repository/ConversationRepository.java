@@ -13,58 +13,86 @@ import java.util.Optional;
 @Repository
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
-    /**
-     * Lookup the unique conversation for a (buyer, seller, product) tuple.
-     */
     Optional<Conversation> findByBuyerIdAndSellerIdAndProductId(
             Long buyerId, Long sellerId, Long productId);
 
     /**
      * All conversations a user participates in (as buyer OR seller),
-     * ordered by most recent activity.
+     * that actually contain at least 1 message OR 1 offer.
+     * Filtered by role (BUYER / SELLER) if provided.
      */
     @Query("""
-        SELECT c FROM Conversation c
-        WHERE c.buyer.id = :userId OR c.seller.id = :userId
+        SELECT DISTINCT c FROM Conversation c
+        LEFT JOIN c.messages m
+        LEFT JOIN c.offers o
+        WHERE (c.buyer.id = :userId OR c.seller.id = :userId)
+          AND (m.id IS NOT NULL OR o.id IS NOT NULL)
+          AND (:roleFilter IS NULL OR :roleFilter = '' 
+               OR (:roleFilter = 'BUYER' AND c.buyer.id = :userId)
+               OR (:roleFilter = 'SELLER' AND c.seller.id = :userId))
         ORDER BY COALESCE(c.lastMessageAt, c.createdAt) DESC
     """)
-    Page<Conversation> findAllForUser(@Param("userId") Long userId, Pageable pageable);
+    Page<Conversation> findAllForUser(
+            @Param("userId") Long userId, 
+            @Param("roleFilter") String roleFilter, 
+            Pageable pageable);
 
     /**
-     * Same as above but filtered to those with unread messages for this user.
-     * A conversation is unread if it contains at least one message
-     * not sent by `userId` and marked read = false.
+     * Conversations with unread messages OR pending offers waiting for the user.
+     * Filtered by role (BUYER / SELLER) if provided.
      */
     @Query("""
         SELECT c FROM Conversation c
         WHERE (c.buyer.id = :userId OR c.seller.id = :userId)
-          AND EXISTS (
-              SELECT 1 FROM Message m
-              WHERE m.conversation.id = c.id
-                AND m.sender.id <> :userId
-                AND m.read = false
+          AND (
+            EXISTS (
+                SELECT 1 FROM Message m
+                WHERE m.conversation.id = c.id
+                  AND m.sender.id <> :userId
+                  AND m.read = false
+            )
+            OR EXISTS (
+                SELECT 1 FROM Offer o
+                WHERE o.conversation.id = c.id
+                  AND o.status = 'PENDING'
+                  AND o.buyer.id <> :userId
+            )
           )
+          AND (:roleFilter IS NULL OR :roleFilter = '' 
+               OR (:roleFilter = 'BUYER' AND c.buyer.id = :userId)
+               OR (:roleFilter = 'SELLER' AND c.seller.id = :userId))
         ORDER BY COALESCE(c.lastMessageAt, c.createdAt) DESC
     """)
-    Page<Conversation> findUnreadForUser(@Param("userId") Long userId, Pageable pageable);
+    Page<Conversation> findUnreadForUser(
+            @Param("userId") Long userId, 
+            @Param("roleFilter") String roleFilter, 
+            Pageable pageable);
 
     /**
-     * Count conversations with unread messages — used by the navbar badge.
+     * Count conversations with unread messages OR pending offers.
      */
     @Query("""
-        SELECT COUNT(c) FROM Conversation c
+        SELECT COUNT(DISTINCT c) FROM Conversation c
         WHERE (c.buyer.id = :userId OR c.seller.id = :userId)
-          AND EXISTS (
-              SELECT 1 FROM Message m
-              WHERE m.conversation.id = c.id
-                AND m.sender.id <> :userId
-                AND m.read = false
+          AND (
+            EXISTS (
+                SELECT 1 FROM Message m
+                WHERE m.conversation.id = c.id
+                  AND m.sender.id <> :userId
+                  AND m.read = false
+            )
+            OR EXISTS (
+                SELECT 1 FROM Offer o
+                WHERE o.conversation.id = c.id
+                  AND o.status = 'PENDING'
+                  AND o.buyer.id <> :userId
+            )
           )
     """)
     long countUnreadForUser(@Param("userId") Long userId);
 
     /**
-     * Ownership/participation check — the user must be the buyer or the seller.
+     * Ownership/participation check.
      */
     @Query("""
         SELECT COUNT(c) > 0 FROM Conversation c
