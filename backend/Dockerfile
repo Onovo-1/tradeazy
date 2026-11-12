@@ -4,16 +4,16 @@
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /app
 
-# Copy the maven wrapper and pom.xml from the backend folder
+# Copy the maven wrapper and pom.xml
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 
-# Download dependencies
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
+# Download dependencies with a specific local repo to avoid memory issues
+RUN chmod +x mvnw && ./mvnw dependency:go-offline -B -Dmaven.repo.local=/tmp/.m2
 
-# Copy the actual source code
+# Copy the actual source code and build the jar
 COPY src ./src
-RUN ./mvnw package -DskipTests
+RUN ./mvnw package -DskipTests -Dmaven.repo.local=/tmp/.m2
 
 # ==========================================
 # Stage 2: Run the application
