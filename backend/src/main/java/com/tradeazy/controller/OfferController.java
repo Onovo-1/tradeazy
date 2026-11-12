@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/offers")
@@ -48,7 +49,7 @@ public class OfferController {
             @Valid @RequestBody CounterOfferRequest request
     ) {
         Long userId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(offerService.update(id, userId, request.getAmount(), request.getNote()));
+        return ResponseEntity.ok(offerService.update(id, userId, request.getAmount(), request.getNote(), request.getQuantity()));
     }
 
     @DeleteMapping("/{id}")
@@ -85,11 +86,16 @@ public class OfferController {
     }
 
     @PostMapping("/{id}/pay")
-    @Operation(summary = "Buyer pays for an accepted offer (creates order)")
-    public ResponseEntity<OrderResponse> pay(@PathVariable Long id) {
-        Long buyerId = SecurityUtils.getCurrentUserId();
+    @Operation(summary = "Trigger order creation from an accepted offer")
+    public ResponseEntity<OrderResponse> pay(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Integer> body
+    ) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        int quantity = (body != null && body.containsKey("quantity")) ? body.get("quantity") : 1;
+        
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.createFromOffer(id, buyerId));
+                .body(orderService.createFromOffer(id, userId, quantity));
     }
 
     @GetMapping("/conversation/{conversationId}")

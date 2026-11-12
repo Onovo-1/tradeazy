@@ -46,12 +46,6 @@ public class OfferService {
         Conversation conversation = conversationRepository.findById(request.getConversationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
-        conversation.getBuyer().getId();
-        conversation.getSeller().getId();
-        conversation.getProduct().getId();
-        conversation.getProduct().getName();
-        conversation.getProduct().getPrice();
-
         if (!conversation.getBuyer().getId().equals(buyerId)) {
             throw new ForbiddenException("Only the buyer can make an offer in this conversation");
         }
@@ -72,20 +66,21 @@ public class OfferService {
                 .buyer(buyer)
                 .seller(conversation.getSeller())
                 .amount(request.getAmount())
+                .quantity(request.getQuantity() != null ? request.getQuantity() : 1) // ADDED
                 .note(request.getNote())
                 .status(OfferStatus.PENDING)
                 .build();
 
         Offer saved = offerRepository.save(offer);
-        log.info("Offer created: id={}, conv={}, buyer={}, amount={}",
-                saved.getId(), conversation.getId(), buyerId, request.getAmount());
+        log.info("Offer created: id={}, conv={}, buyer={}, amount={}, qty={}",
+                saved.getId(), conversation.getId(), buyerId, request.getAmount(), saved.getQuantity());
 
         notificationService.notify(
                 conversation.getSeller().getId(),
                 buyerId,
                 NotificationType.NEW_OFFER,
                 "New offer received",
-                buyer.getFirstName() + " offered ₦" + request.getAmount() + " for " + conversation.getProduct().getName(),
+                buyer.getFirstName() + " offered ₦" + request.getAmount() + " for " + saved.getQuantity() + "x " + conversation.getProduct().getName(),
                 saved.getId(),
                 "/messages?c=" + conversation.getId()
         );
@@ -121,6 +116,7 @@ public class OfferService {
                 .buyer(buyer)
                 .seller(seller)
                 .amount(effectivePrice)
+                .quantity(1) // Buy Now defaults to 1
                 .note("I want to buy this at full price.")
                 .status(OfferStatus.PENDING)
                 .build();
@@ -143,7 +139,7 @@ public class OfferService {
     }
 
     @Transactional
-    public OfferResponse update(Long offerId, Long userId, java.math.BigDecimal newAmount, String newNote) {
+    public OfferResponse update(Long offerId, Long userId, java.math.BigDecimal newAmount, String newNote, Integer newQuantity) {
         Offer offer = offerRepository.findById(offerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Offer not found"));
 
@@ -160,9 +156,10 @@ public class OfferService {
 
         offer.setAmount(newAmount);
         offer.setNote(newNote);
+        if (newQuantity != null) offer.setQuantity(newQuantity);
         
         Offer saved = offerRepository.save(offer);
-        log.info("Offer {} updated by user {} to amount {}", offerId, userId, newAmount);
+        log.info("Offer {} updated by user {} to amount {} qty {}", offerId, userId, newAmount, saved.getQuantity());
 
         return toResponse(saved, userId);
     }
@@ -288,14 +285,15 @@ public class OfferService {
                 .buyer(parent.getBuyer())
                 .seller(parent.getSeller())
                 .amount(request.getAmount())
+                .quantity(request.getQuantity() != null ? request.getQuantity() : 1) // ADDED
                 .note(request.getNote())
                 .status(OfferStatus.PENDING)
                 .parentOffer(parent)
                 .build();
 
         Offer saved = offerRepository.save(counter);
-        log.info("Counter offer {} created from parent {} by user {} (role: {})",
-                saved.getId(), parentOfferId, userId, amBuyer ? "BUYER" : "SELLER");
+        log.info("Counter offer {} created from parent {} by user {}",
+                saved.getId(), parentOfferId, userId);
 
         Long recipientId = amBuyer ? parent.getSeller().getId() : parent.getBuyer().getId();
 
@@ -349,6 +347,7 @@ public class OfferService {
                 .sellerId(o.getSeller().getId())
                 .sellerUsername(o.getSeller().getUsername())
                 .amount(o.getAmount())
+                .quantity(o.getQuantity()) // MAPPED HERE
                 .status(o.getStatus().name())
                 .parentOfferId(o.getParentOffer() != null ? o.getParentOffer().getId() : null)
                 .note(o.getNote())

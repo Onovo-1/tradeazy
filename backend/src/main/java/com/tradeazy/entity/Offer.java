@@ -7,12 +7,6 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-/**
- * A structured price offer made by a buyer inside a conversation about a product.
- *
- * Sellers can accept, reject, or counter. Counter-offers point back to the
- * original offer via parentOffer.
- */
 @Entity
 @Table(
     name = "offers",
@@ -53,6 +47,11 @@ public class Offer {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
+    // NEW: Quantity field
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer quantity = 1;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
@@ -77,6 +76,7 @@ public class Offer {
         this.createdAt = now;
         this.updatedAt = now;
         if (this.status == null) this.status = OfferStatus.PENDING;
+        if (this.quantity == null) this.quantity = 1; // Ensure default
     }
 
     @PreUpdate

@@ -11,7 +11,6 @@ import java.time.OffsetDateTime;
 @AllArgsConstructor
 @Builder
 public class OfferResponse {
-
     private Long id;
     private Long conversationId;
     private Long productId;
@@ -24,6 +23,10 @@ public class OfferResponse {
     private String sellerUsername;
 
     private BigDecimal amount;
+    
+    // NEW: Quantity field
+    private Integer quantity;
+
     private String status;
     private Long parentOfferId;
     private String note;

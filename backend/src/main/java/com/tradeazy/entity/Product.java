@@ -11,15 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(
-    name = "products",
-    indexes = {
-        @Index(name = "idx_products_seller", columnList = "seller_id"),
-        @Index(name = "idx_products_category", columnList = "category_id"),
-        @Index(name = "idx_products_status", columnList = "status"),
-        @Index(name = "idx_products_created_at", columnList = "created_at")
-    }
-)
+@Table(name = "products")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -31,66 +23,61 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 150)
+    @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal price;
 
     @Column(nullable = false)
+    private Integer quantity;
+
+    @Column(name = "sold_count", nullable = false)
     @Builder.Default
-    private Integer quantity = 1;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "`condition`", nullable = false, length = 20)
-    private ProductCondition condition;
-
-    @Column(nullable = false, length = 120)
-    private String location;
+    private Integer soldCount = 0;
 
     @Column(name = "discount_percent")
     @Builder.Default
     private Integer discountPercent = 0;
 
-    @Column(columnDefinition = "TEXT")
-    private String specifications;
+    // FIXED: Backticks around `condition` because it's a MySQL reserved keyword
+    @Enumerated(EnumType.STRING)
+    @Column(name = "`condition`", nullable = false)
+    private ProductCondition condition;
+
+    @Column(nullable = false)
+    private String location;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false)
     @Builder.Default
     private ProductStatus status = ProductStatus.ACTIVE;
 
     @Column(name = "view_count", nullable = false)
     @Builder.Default
-    private Long viewCount = 0L;
+    private Integer viewCount = 0;
 
     @Column(name = "favorite_count", nullable = false)
     @Builder.Default
-    private Long favoriteCount = 0L;
+    private Integer favoriteCount = 0;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "seller_id", nullable = false)
-    private User seller;
+    @Column(columnDefinition = "TEXT")
+    private String specifications;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    @OneToMany(
-        mappedBy = "product",
-        cascade = CascadeType.ALL,
-        orphanRemoval = true,
-        fetch = FetchType.LAZY
-    )
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "seller_id", nullable = false)
+    private User seller;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ProductImage> images = new ArrayList<>();
-
-    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Favorite> favorites = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -100,48 +87,18 @@ public class Product {
 
     @PrePersist
     protected void onCreate() {
-        OffsetDateTime now = OffsetDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-        if (this.status == null) this.status = ProductStatus.ACTIVE;
-        if (this.viewCount == null) this.viewCount = 0L;
-        if (this.favoriteCount == null) this.favoriteCount = 0L;
-        if (this.quantity == null) this.quantity = 1;
-        if (this.discountPercent == null) this.discountPercent = 0;
+        createdAt = OffsetDateTime.now();
+        updatedAt = OffsetDateTime.now();
     }
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = OffsetDateTime.now();
-    }
-
-    public void addImage(ProductImage image) {
-        images.add(image);
-        image.setProduct(this);
-    }
-
-    public void removeImage(ProductImage image) {
-        images.remove(image);
-        image.setProduct(null);
+        updatedAt = OffsetDateTime.now();
     }
 
     public BigDecimal getEffectivePrice() {
-        if (discountPercent == null || discountPercent <= 0) return price;
-        BigDecimal discount = price
-                .multiply(BigDecimal.valueOf(discountPercent))
-                .divide(BigDecimal.valueOf(100));
-        return price.subtract(discount).setScale(2, java.math.RoundingMode.HALF_UP);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Product other)) return false;
-        return id != null && id.equals(other.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
+        if (discountPercent == null || discountPercent == 0) return price;
+        BigDecimal discount = price.multiply(BigDecimal.valueOf(discountPercent)).divide(BigDecimal.valueOf(100));
+        return price.subtract(discount);
     }
 }

@@ -21,6 +21,8 @@ public class OfferRequest {
     @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
     private BigDecimal amount;
 
+    private Integer quantity; // ADDED
+
     @Size(max = 500, message = "Note must be at most 500 characters")
     private String note;
 }

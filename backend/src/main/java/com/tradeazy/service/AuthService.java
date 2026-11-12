@@ -124,45 +124,9 @@ public class AuthService {
                 .build();
     }
 
-    // ================================================================
-    // PASSWORD RESET (NEW)
-    // ================================================================
-    @Transactional
-    public void requestPasswordReset(String email) {
-        User user = userRepository.findByEmail(email).orElse(null);
-        if (user == null) {
-            // Don't reveal if email exists (security best practice)
-            System.out.println(">>> Password reset requested for non-existent email: " + email);
-            return;
-        }
-
-        // Generate random token
-        String token = UUID.randomUUID().toString();
-
-        // Save token in the password field (temporary hack - for real prod, add a reset_token column)
-        user.setPassword("RESET:" + token);
-        userRepository.save(user);
-
-        // Print reset link to backend console for dev testing
-        String resetLink = "http://localhost:5173/reset-password?token=" + token;
-        System.out.println("================================================================");
-        System.out.println(">>> PASSWORD RESET LINK for " + email);
-        System.out.println(">>> " + resetLink);
-        System.out.println("================================================================");
-    }
-
-    @Transactional
-    public void resetPassword(String token, String newPassword) {
-        // Find user whose password field starts with RESET: followed by the token
-        String match = "RESET:" + token;
-        User user = userRepository.findAll().stream()
-                .filter(u -> u.getPassword() != null && u.getPassword().equals(match))
-                .findFirst()
-                .orElseThrow(() -> new InvalidOperationException("Invalid or expired reset token"));
-
-        // Hash new password and save
-        user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
-        System.out.println(">>> Password reset for user: " + user.getUsername());
+    public UserResponse getProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        return UserMapper.toResponse(user);
     }
 }

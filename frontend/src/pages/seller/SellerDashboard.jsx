@@ -15,7 +15,6 @@ export default function SellerDashboard() {
     (async () => {
       try {
         setLoading(true);
-        // Fetch all seller products to calculate stats and show the table
         const res = await productApi.listMyProducts({ page: 0, size: 100 });
         if (!cancelled) {
           setProducts(res.content || []);
@@ -34,10 +33,17 @@ export default function SellerDashboard() {
     };
   }, []);
 
-  // Calculate stats
+  // CALCULATE STATS
+  // Total = Number of distinct listings
   const total = products.length;
-  const active = products.filter((p) => p.status === "ACTIVE").length;
-  const sold = products.filter((p) => p.status === "SOLD").length;
+  
+  // Active = Sum of quantities for all ACTIVE products
+  const active = products.reduce((acc, p) => acc + (p.status === "ACTIVE" ? p.quantity : 0), 0);
+  
+  // Sold = Sum of soldCount for all products
+  const sold = products.reduce((acc, p) => acc + (p.soldCount || 0), 0);
+  
+  // Removed = Number of distinct listings that are REMOVED
   const removed = products.filter((p) => p.status === "REMOVED").length;
 
   return (
@@ -61,19 +67,19 @@ export default function SellerDashboard() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total Listings</h3>
             <p className="text-3xl font-extrabold text-gray-900">{loading ? "..." : total}</p>
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Active</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Active Stock</h3>
             <p className="text-3xl font-extrabold text-green-600">{loading ? "..." : active}</p>
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Sold</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Items Sold</h3>
             <p className="text-3xl font-extrabold text-maroon-700">{loading ? "..." : sold}</p>
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Removed</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Removed Items</h3>
             <p className="text-3xl font-extrabold text-gray-400">{loading ? "..." : removed}</p>
           </div>
         </div>
@@ -97,7 +103,7 @@ export default function SellerDashboard() {
           </div>
         </div>
 
-        {/* Recent Products Table (Optional, but looks great) */}
+        {/* Recent Listings */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-lg font-bold text-gray-900">Recent Listings</h2>

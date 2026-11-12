@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import axiosClient from "../../api/axiosClient";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -10,11 +11,21 @@ export default function Navbar() {
   const location = useLocation();
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [orderCount, setOrderCount] = useState(0);
 
   const isAdmin = user?.roles?.includes("ADMIN");
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
   const isSellerPage = location.pathname.startsWith("/seller");
   const isAdminPage = location.pathname.startsWith("/admin");
+
+  // Fetch order count when user is logged in
+  useEffect(() => {
+    if (user && !isAdmin) {
+      axiosClient.get("/orders/unread-count")
+        .then(res => setOrderCount(res.data.unreadOrders || 0))
+        .catch(() => {});
+    }
+  }, [user, isAdmin, location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -28,20 +39,19 @@ export default function Navbar() {
     }
   };
 
-  // Debugging log to see what the navbar thinks the count is
-  console.log("Navbar Render - Unread Count:", count);
+  // Combine message count and order count for the global badge
+  const totalNotifications = (count || 0) + (orderCount || 0);
 
   return (
     <nav className="bg-maroon-900 text-white relative z-50">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         
-        {/* Logo */}
+        {/* Logo takes Admin to Admin Dashboard, others to Home */}
         <Link to={isAdmin ? "/admin/dashboard" : "/"} className="flex items-center gap-2">
           <img src="/tradeazy-favicon.png" alt="Logo" className="h-8 w-auto object-contain" />
           <span className="text-2xl font-bold tracking-tight">Tradeazy</span>
         </Link>
 
-        {/* Search Bar */}
         {!isAdmin && !isAuthPage && !isSellerPage && !isAdminPage && (
           <form onSubmit={handleSearch} className="ml-8 w-full max-w-md hidden md:block">
             <input
@@ -54,7 +64,6 @@ export default function Navbar() {
           </form>
         )}
 
-        {/* User Menu */}
         {!isAuthPage && (
           <div className="flex items-center gap-4 ml-auto">
             {user ? (
@@ -69,20 +78,26 @@ export default function Navbar() {
                   </>
                 ) : (
                   <div className="relative group">
-                    <button className="flex items-center gap-2 hover:text-maroon-200 py-4 transition">
+                    <button className="flex items-center gap-2 hover:text-maroon-200 py-4 transition relative">
                       <span>Hi, {user.firstName}</span>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                       </svg>
+                      {/* GLOBAL NOTIFICATION DOT ON THE AVATAR */}
+                      {totalNotifications > 0 && (
+                         <span className="absolute top-2 right-0 flex h-3 w-3">
+                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                           <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                         </span>
+                      )}
                     </button>
                     
-                    <div className="absolute right-0 mt-0 w-48 bg-white rounded-lg shadow-lg py-1 text-gray-800 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                      <Link to="/favorites" className="block px-4 py-2 hover:bg-gray-100 text-sm flex items-center gap-2">
+                    <div className="absolute right-0 mt-0 w-56 bg-white rounded-lg shadow-lg py-1 text-gray-800 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                      <Link to="/favorites" className="block px-4 py-2.5 hover:bg-gray-100 text-sm flex items-center gap-2">
                         <span className="text-gray-400">♡</span> Saved
                       </Link>
                       
-                      {/* Messages with Unread Badge */}
-                      <Link to="/messages" className="block px-4 py-2 hover:bg-gray-100 text-sm flex items-center justify-between">
+                      <Link to="/messages" className="block px-4 py-2.5 hover:bg-gray-100 text-sm flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-gray-400">💬</span> Messages
                         </div>
@@ -93,14 +108,27 @@ export default function Navbar() {
                         )}
                       </Link>
 
-                      <Link to="/orders" className="block px-4 py-2 hover:bg-gray-100 text-sm flex items-center gap-2">
-                        <span className="text-gray-400">📦</span> Orders
+                      <Link to="/orders" className="block px-4 py-2.5 hover:bg-gray-100 text-sm flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">📦</span> Orders
+                        </div>
+                        {orderCount > 0 && (
+                          <span className="bg-maroon-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {orderCount}
+                          </span>
+                        )}
                       </Link>
-                      
+
                       {user.roles?.includes("SELLER") && (
-                        <Link to="/seller/dashboard" className="block px-4 py-2 hover:bg-gray-100 text-sm flex items-center gap-2">
-                          <span className="text-gray-400">🏪</span> Seller Dashboard
-                        </Link>
+                        <>
+                          <div className="border-t border-gray-200 my-1"></div>
+                          <Link 
+                            to="/seller/dashboard" 
+                            className="block px-4 py-2.5 hover:bg-maroon-50 text-sm flex items-center gap-2 font-bold text-maroon-800 transition-colors"
+                          >
+                            <span className="text-lg">🏪</span> Seller Dashboard
+                          </Link>
+                        </>
                       )}
                     </div>
                   </div>

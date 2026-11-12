@@ -14,7 +14,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -41,26 +40,5 @@ public class AuthController {
     public ResponseEntity<UserResponse> me() {
         Long userId = SecurityUtils.getCurrentUserId();
         return ResponseEntity.ok(authService.getProfile(userId));
-    }
-
-    // NEW: Request a password reset (generate token)
-    @PostMapping("/forgot-password")
-    @Operation(summary = "Request a password reset link")
-    public ResponseEntity<Map<String, String>> forgotPassword(@RequestBody Map<String, String> body) {
-        String email = body.get("email");
-        authService.requestPasswordReset(email);
-        return ResponseEntity.ok(Map.of(
-            "message", "If an account with that email exists, a reset link has been sent."
-        ));
-    }
-
-    // NEW: Reset the password using a token
-    @PostMapping("/reset-password")
-    @Operation(summary = "Reset password with a token")
-    public ResponseEntity<Map<String, String>> resetPassword(@RequestBody Map<String, String> body) {
-        String token = body.get("token");
-        String newPassword = body.get("newPassword");
-        authService.resetPassword(token, newPassword);
-        return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
     }
 }

@@ -16,7 +16,13 @@ export default function ForgotPassword() {
       await axiosClient.post("/auth/forgot-password", { email });
       setSubmitted(true);
     } catch (err) {
-      setError("Something went wrong. Try again.");
+      if (!err.response) {
+        setError("Cannot reach the server. Make sure the backend is running on port 8080.");
+      } else if (err.response.status === 401 || err.response.status === 403) {
+        setError("The server blocked this request (" + err.response.status + "). Restart the backend after the security update.");
+      } else {
+        setError(err.response?.data?.message || "Something went wrong. Try again.");
+      }
     } finally {
       setLoading(false);
     }

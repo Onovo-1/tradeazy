@@ -9,13 +9,6 @@ import com.tradeazy.entity.ProductImage;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Converts Product entities into the DTOs the API exposes.
- *
- * IMPORTANT: The caller must be inside a @Transactional method.
- * Product.images is LAZY, and accessing it outside a session throws
- * LazyInitializationException. Services handle this by being @Transactional.
- */
 public final class ProductMapper {
 
     private ProductMapper() {
@@ -35,7 +28,7 @@ public final class ProductMapper {
                 .price(product.getPrice())
                 .effectivePrice(product.getEffectivePrice())
                 .discountPercent(product.getDiscountPercent())
-                .quantity(product.getQuantity())
+                .quantity(product.getQuantity() != null ? product.getQuantity() : 0) // FIXED: Kept as Integer
                 .condition(product.getCondition())
                 .status(product.getStatus())
                 .location(product.getLocation())
@@ -65,7 +58,8 @@ public final class ProductMapper {
                 .condition(product.getCondition())
                 .status(product.getStatus())
                 .location(product.getLocation())
-                .quantity(product.getQuantity()) // <--- ADDED THIS
+                .quantity(product.getQuantity() != null ? product.getQuantity() : 0) // Kept as Integer
+                .soldCount(product.getSoldCount() != null ? product.getSoldCount() : 0) // Added
                 .primaryImageUrl(findPrimaryImageUrl(product.getImages()))
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
                 .categorySlug(product.getCategory() != null ? product.getCategory().getSlug() : null)

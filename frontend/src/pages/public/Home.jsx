@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { productApi } from "../../api/productApi";
 import { categoryApi } from "../../api/categoryApi";
-import { favoriteApi } from "../../api/favoriteApi"; // Added import
+import { favoriteApi } from "../../api/favoriteApi"; 
 import ProductGrid from "../../components/product/ProductGrid";
 import { useAuth } from "../../context/AuthContext";
 
@@ -10,7 +10,7 @@ export default function Home() {
   const { user, isAuthenticated } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [savedProductIds, setSavedProductIds] = useState([]); // Added state
+  const [savedProductIds, setSavedProductIds] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -21,20 +21,38 @@ export default function Home() {
       try {
         setLoading(true);
         
-        // Fetch products, categories, and favorites in parallel
+        // Fetch products sorted by most popular (view count)
         const [productsRes, categoriesRes, favoritesRes] = await Promise.all([
-          productApi.list({ page: 0, size: 8, sort: "newest" }),
+          productApi.list({ page: 0, size: 100, sort: "popular" }),
           categoryApi.list(),
           isAuthenticated ? favoriteApi.list().catch(() => ({ content: [] })) : Promise.resolve({ content: [] })
         ]);
         
         if (!cancelled) {
-          setProducts(productsRes.content || []);
+          let fetchedProducts = productsRes.content || [];
           setCategories(categoriesRes || []);
           
-          // Extract the IDs of the favorited products
           const favIds = (favoritesRes.content || []).map(f => f.productId || f.id);
           setSavedProductIds(favIds);
+
+          try {
+            const recentlyVisited = JSON.parse(localStorage.getItem("tradeazy_recent_categories") || "[]");
+            if (recentlyVisited.length > 0) {
+              fetchedProducts.sort((a, b) => {
+                const aCatName = a.category?.name || a.categoryName;
+                const bCatName = b.category?.name || b.categoryName;
+                const aMatch = recentlyVisited.includes(aCatName);
+                const bMatch = recentlyVisited.includes(bCatName);
+                if (aMatch && !bMatch) return -1;
+                if (!aMatch && bMatch) return 1;
+                return 0;
+              });
+            }
+          } catch (e) {
+            console.error("Smart sort failed, using default order.", e);
+          }
+
+          setProducts(fetchedProducts);
         }
       } catch (err) {
         if (!cancelled) {
@@ -48,7 +66,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]); // Re-run if auth state changes
+  }, [isAuthenticated]);
 
   const isSeller = user?.roles?.includes("SELLER");
 
@@ -91,7 +109,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Categories with Hover Dropdown */}
+      {/* 1. Categories */}
       <section className="max-w-7xl mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xl font-bold text-gray-900">Categories</h2>
@@ -115,7 +133,6 @@ export default function Home() {
                 {cat.name}
               </Link>
 
-              {/* Dropdown for subcategories */}
               {cat.children && cat.children.length > 0 && (
                 <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-100 py-2 text-gray-800 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   {cat.children.map((sub) => (
@@ -134,7 +151,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Products */}
+      {/* 2. Products */}
       <section className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">Fresh listings</h2>
@@ -153,9 +170,10 @@ export default function Home() {
           products={products}
           loading={loading}
           emptyMessage="No products yet. Be the first to list something!"
-          savedProductIds={savedProductIds} // Passed here!
+          savedProductIds={savedProductIds} 
         />
       </section>
+
     </div>
   );
 }

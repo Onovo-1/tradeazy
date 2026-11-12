@@ -3,7 +3,8 @@ spring:
     name: tradeazy-backend
 
   datasource:
-    url: jdbc:mysql://localhost:3306/tradeazy_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Africa/Lagos&allowPublicKeyRetrieval=true
+    # Updated: Uses DB_URL env var for production, falls back to localhost for dev
+    url: ${DB_URL:jdbc:mysql://localhost:3306/tradeazy_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Africa/Lagos&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:tradeazy_user}
     password: ${DB_PASSWORD:TradeazyDev@123}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -22,7 +23,8 @@ spring:
       max-request-size: 50MB
 
 server:
-  port: 8080
+  # Updated: Uses PORT env var for Render, falls back to 8080 for dev
+  port: ${PORT:8080}
 
 jwt:
   secret: ${JWT_SECRET:hF3j9aBd7KzXq2YvB1nM8sLpQ4tR6wE9cU0iO5pA3dS7fG2hJ4kL8mN1bV0xC6zW9qY2rT5uI8oP3aS6dF9gH0jK4lM7nB2vC5xZ8}
@@ -32,7 +34,8 @@ tradeazy:
   upload:
     dir: ${UPLOAD_DIR:./uploads}
   cors:
-    allowed-origins: http://localhost:5173,http://192.168.0.196:5173
+    # You will need to add your Render frontend URL here later (e.g., https://tradeazy-frontend.onrender.com)
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://192.168.0.196:5173}
   seed:
     admin:
       username: ${ADMIN_USERNAME:superadmin}

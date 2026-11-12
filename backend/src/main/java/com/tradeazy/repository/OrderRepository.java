@@ -1,7 +1,6 @@
 package com.tradeazy.repository;
 
 import com.tradeazy.entity.Order;
-import com.tradeazy.entity.enums.OrderPaymentStatus;
 import com.tradeazy.entity.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,14 +25,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     long countBySellerId(Long sellerId);
     long countBySellerIdAndStatus(Long sellerId, OrderStatus status);
     long countByBuyerId(Long buyerId);
+    
+    // ADDED: This is what the navbar calls
+    long countByBuyerIdAndStatus(Long buyerId, OrderStatus status);
 
     // --- Admin helpers ---
     long countByStatus(OrderStatus status);
 
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.paymentStatus = :paid")
-    BigDecimal sumTotalPaid(@Param("paid") OrderPaymentStatus paid);
+    BigDecimal sumTotalPaid(@Param("paid") com.tradeazy.entity.enums.OrderPaymentStatus paid);
 
     default BigDecimal sumTotalPaid() {
-        return sumTotalPaid(OrderPaymentStatus.PAID);
+        return sumTotalPaid(com.tradeazy.entity.enums.OrderPaymentStatus.PAID);
     }
 }

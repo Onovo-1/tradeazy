@@ -4,102 +4,63 @@ import com.tradeazy.entity.enums.RoleName;
 import com.tradeazy.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
-@Table(
-    name = "users",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_users_email",    columnNames = "email"),
-        @UniqueConstraint(name = "uk_users_username", columnNames = "username"),
-        @UniqueConstraint(name = "uk_users_phone",    columnNames = "phone")
-    },
-    indexes = {
-        @Index(name = "idx_users_status", columnList = "status"),
-        @Index(name = "idx_users_created_at", columnList = "created_at")
-    }
-)
+@Table(name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "first_name", nullable = false, length = 60)
+    @Column(nullable = false)
     private String firstName;
 
-    @Column(name = "last_name", nullable = false, length = 60)
+    @Column(nullable = false)
     private String lastName;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(nullable = false, length = 120)
+    @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, unique = true)
     private String phone;
 
-    @Column(nullable = false, length = 72)
+    @Column(nullable = false)
     private String password;
 
-    @Column(name = "profile_picture_url", length = 500)
+    private String location;
     private String profilePictureUrl;
 
-    @Column(length = 120)
-    private String location;
-
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false)
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
 
-    @ManyToMany(fetch = FetchType.LAZY)
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
-        name = "user_roles",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id"),
-        uniqueConstraints = @UniqueConstraint(
-            name = "uk_user_roles_user_role",
-            columnNames = {"user_id", "role_id"}
-        )
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
-
-    @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Product> products = new ArrayList<>();
-
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Favorite> favorites = new ArrayList<>();
-
-    @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Subscription> subscriptions = new ArrayList<>();
-
-    @OneToMany(mappedBy = "buyer", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Order> purchases = new ArrayList<>();
-
-    @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Order> sales = new ArrayList<>();
-
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Notification> notifications = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -109,34 +70,47 @@ public class User {
 
     @PrePersist
     protected void onCreate() {
-        OffsetDateTime now = OffsetDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-        if (this.status == null) this.status = UserStatus.ACTIVE;
+        createdAt = OffsetDateTime.now();
+        updatedAt = OffsetDateTime.now();
     }
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = OffsetDateTime.now();
+        updatedAt = OffsetDateTime.now();
     }
 
+    // --- Helper Methods for Roles ---
+
     public void addRole(Role role) {
+        if (this.roles == null) {
+            this.roles = new HashSet<>();
+        }
         this.roles.add(role);
     }
 
     public boolean hasRole(RoleName roleName) {
+        if (this.roles == null) return false;
         return this.roles.stream().anyMatch(r -> r.getName() == roleName);
     }
 
+    // --- UserDetails Methods ---
+
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof User other)) return false;
-        return id != null && id.equals(other.id);
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return roles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName().name()))
+                .collect(Collectors.toList());
     }
 
     @Override
-    public int hashCode() {
-        return getClass().hashCode();
-    }
+    public boolean isAccountNonExpired() { return true; }
+
+    @Override
+    public boolean isAccountNonLocked() { return true; }
+
+    @Override
+    public boolean isCredentialsNonExpired() { return true; }
+
+    @Override
+    public boolean isEnabled() { return status == UserStatus.ACTIVE; }
 }

@@ -4,6 +4,7 @@ import com.tradeazy.dto.request.CreateOrderRequest;
 import com.tradeazy.dto.request.UpdateOrderStatusRequest;
 import com.tradeazy.dto.response.OrderResponse;
 import com.tradeazy.dto.response.PagedResponse;
+import com.tradeazy.repository.OrderRepository;
 import com.tradeazy.security.SecurityUtils;
 import com.tradeazy.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderRepository orderRepository; // INJECTED
 
     // ------------------------------------------------------------
     // Buyer creates order
@@ -57,6 +61,17 @@ public class OrderController {
     ) {
         Long sellerId = SecurityUtils.getCurrentUserId();
         return ResponseEntity.ok(orderService.listForSeller(sellerId, page, size));
+    }
+
+    // ------------------------------------------------------------
+    // Notification Badge Count
+    // ------------------------------------------------------------
+    @GetMapping("/unread-count")
+    @Operation(summary = "Get count of active/unread orders for the buyer")
+    public ResponseEntity<Map<String, Long>> getUnreadOrderCount() {
+        Long buyerId = SecurityUtils.getCurrentUserId();
+        long count = orderRepository.countByBuyerIdAndStatus(buyerId, com.tradeazy.entity.enums.OrderStatus.CONFIRMED);
+        return ResponseEntity.ok(Map.of("unreadOrders", count));
     }
 
     // ------------------------------------------------------------

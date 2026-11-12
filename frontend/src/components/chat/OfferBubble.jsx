@@ -6,16 +6,7 @@ function formatTime(iso) {
 }
 
 export default function OfferBubble({ 
-  offer, 
-  isMine, 
-  canRespond, 
-  onAccept, 
-  onReject, 
-  onCounter, 
-  onEdit,
-  onDelete,
-  onPay,
-  busy 
+  offer, isMine, canRespond, onAccept, onReject, onCounter, onEdit, onDelete, onPay, busy, role 
 }) {
   const isPending = offer.status === "PENDING";
   const isAccepted = offer.status === "ACCEPTED";
@@ -38,93 +29,60 @@ export default function OfferBubble({
     badgeClass = "bg-blue-100 text-blue-800 border-blue-200";
   }
 
+  const qty = offer.quantity || 1;
+  const unitPrice = offer.amount / qty;
+  const totalPrice = offer.amount;
+
   return (
     <div className={`flex ${isMine ? "justify-end" : "justify-start"} group`}>
-      
       {isMine && isPending && (
         <div className="opacity-0 group-hover:opacity-100 transition flex items-center gap-1 pr-2">
-          <button 
-            type="button"
-            onClick={() => onEdit && onEdit(offer)} 
-            className="text-gray-400 hover:text-maroon-700 p-1"
-            title="Edit Offer"
-          >
-            ✎
-          </button>
-          <button 
-            type="button"
-            onClick={() => onDelete && onDelete(offer)} 
-            className="text-gray-400 hover:text-red-600 p-1"
-            title="Delete Offer"
-          >
-            🗑
-          </button>
+          <button type="button" onClick={() => onEdit && onEdit(offer)} className="text-gray-400 hover:text-maroon-700 p-1" title="Edit Offer">✎</button>
+          <button type="button" onClick={() => onDelete && onDelete(offer)} className="text-gray-400 hover:text-red-600 p-1" title="Delete Offer">🗑</button>
         </div>
       )}
 
       <div className={`max-w-[75%] border-2 rounded-2xl p-4 shadow-sm ${bgClass} ${isMine ? "rounded-br-sm" : "rounded-bl-sm"}`}>
-        
         <div className="flex items-center justify-between mb-2">
-          <div className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1 ${textClass}`}>
-            🛒 Offer
+          <div className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1 ${textClass}`}>🛒 Offer</div>
+          <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${badgeClass}`}>{offer.status}</div>
+        </div>
+
+        <div className={`mb-3 ${textClass}`}>
+          <div className="flex justify-between items-center text-sm opacity-90 mb-1">
+            <span>Price per item:</span>
+            <span className="font-semibold">{formatNaira(unitPrice)}</span>
           </div>
-          <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${badgeClass}`}>
-            {offer.status}
+          <div className="flex justify-between items-center text-sm opacity-90 mb-2">
+            <span>Quantity:</span>
+            <span className="font-semibold">{qty}</span>
+          </div>
+          <div className="flex justify-between items-center border-t border-current/20 pt-2">
+            <span className="text-sm font-bold">Total Offer:</span>
+            <span className="text-xl font-extrabold">{formatNaira(totalPrice)}</span>
           </div>
         </div>
 
-        <div className={`text-2xl font-extrabold mb-2 ${textClass}`}>
-          {formatNaira(offer.amount)}
-        </div>
+        {offer.note && <p className={`text-sm mb-2 ${textClass} opacity-90`}>"{offer.note}"</p>}
+        <div className={`text-[10px] text-right ${textClass} opacity-70 mb-3`}>{formatTime(offer.createdAt)}</div>
 
-        {offer.note && (
-          <p className={`text-sm mb-2 ${textClass} opacity-90`}>
-            "{offer.note}"
-          </p>
-        )}
-
-        <div className={`text-[10px] text-right ${textClass} opacity-70 mb-3`}>
-          {formatTime(offer.createdAt)}
-        </div>
-
-        {/* PAY NOW (buyer only, accepted offer) */}
-        {isAccepted && isMine && onPay && (
+        {/* MARK AS ORDERED (Seller only, accepted offer) */}
+        {isAccepted && role === "SELLER" && onPay && (
           <button
             type="button"
-            onClick={() => onPay(offer.id)}
+            onClick={() => onPay(offer)}
             disabled={busy}
             className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm transition disabled:opacity-50"
           >
-            💳 Pay Now
+            📦 Mark as Ordered
           </button>
         )}
 
         {canRespond && (
           <div className="flex gap-2 mt-4 pt-3 border-t border-black/5">
-            <button
-              type="button"
-              onClick={onAccept}
-              disabled={busy}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 px-3 rounded-lg text-sm transition disabled:opacity-50"
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              onClick={onReject}
-              disabled={busy}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-3 rounded-lg text-sm transition disabled:opacity-50"
-            >
-              Reject
-            </button>
-            <button
-              type="button"
-              onClick={onCounter}
-              disabled={busy}
-              className="flex-1 bg-maroon-700 hover:bg-maroon-800 text-white font-bold py-1.5 px-3 rounded-lg text-sm transition disabled:opacity-50"
-            >
-              Counter
-            </button>
+            <button type="button" onClick={onAccept} disabled={busy} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 px-3 rounded-lg text-sm transition disabled:opacity-50">Accept</button>
+            <button type="button" onClick={onReject} disabled={busy} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-3 rounded-lg text-sm transition disabled:opacity-50">Reject</button>
+            <button type="button" onClick={onCounter} disabled={busy} className="flex-1 bg-maroon-700 hover:bg-maroon-800 text-white font-bold py-1.5 px-3 rounded-lg text-sm transition disabled:opacity-50">Counter</button>
           </div>
         )}
       </div>

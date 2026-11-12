@@ -14,20 +14,18 @@ import ProductDetails from "./pages/public/ProductDetails";
 import Login from "./pages/public/Login";
 import Register from "./pages/public/Register";
 import Favorites from "./pages/public/Favorites";
-import ForgotPassword from "./pages/public/ForgotPassword";
-import ResetPassword from "./pages/public/ResetPassword";
 
 // Seller Pages
 import SellerDashboard from "./pages/seller/SellerDashboard";
 import MyProducts from "./pages/seller/MyProducts";
 import AddProduct from "./pages/seller/AddProduct";
 import EditProduct from "./pages/seller/EditProduct";
-import SellerOrders from "./pages/seller/SellerOrders";
 import Rent from "./pages/seller/Rent";
+import SellerOrders from "./pages/seller/SellerOrders"; 
 
 // Buyer Pages
 import Messages from "./pages/buyer/Messages";
-import BuyerOrders from "./pages/buyer/Orders";
+import BuyerOrders from "./pages/buyer/Orders"; // <-- ADDED THIS IMPORT
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -50,14 +48,12 @@ export default function App() {
             <Route path="/products/:id" element={<ProductDetails />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/favorites" element={<Favorites />} />
 
             {/* Protected Buyer Routes */}
             <Route element={<ProtectedRoute />}>
               <Route path="/messages" element={<Messages />} />
-              <Route path="/orders" element={<BuyerOrders />} />
+              <Route path="/orders" element={<BuyerOrders />} /> {/* <-- ADDED THIS ROUTE */}
             </Route>
 
             {/* Protected Seller Routes */}
@@ -68,8 +64,8 @@ export default function App() {
                 <Route path="products" element={<MyProducts />} />
                 <Route path="products/new" element={<AddProduct />} />
                 <Route path="products/edit/:id" element={<EditProduct />} />
-                <Route path="orders" element={<SellerOrders />} />
                 <Route path="rent" element={<Rent />} />
+                <Route path="orders" element={<SellerOrders />} /> 
               </Route>
             </Route>
 

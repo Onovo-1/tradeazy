@@ -7,6 +7,7 @@ import { offerApi } from "../../api/offerApi";
 import ConfirmModal from "../common/ConfirmModal";
 import OfferModal from "./OfferModal";
 import OfferBubble from "./OfferBubble";
+import { formatNaira } from "../../utils/formatters";
 
 function formatTime(iso) {
   if (!iso) return "";
@@ -22,7 +23,16 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
   
   const [offers, setOffers] = useState([]);
   const [offerBusy, setOfferBusy] = useState(false);
-  const [modal, setModal] = useState({ open: false, mode: "create", baseAmount: "", editingOfferId: null });
+  
+  // MODAL STATE
+  const [modal, setModal] = useState({ 
+    open: false, 
+    mode: "create", 
+    baseAmount: "", 
+    initialQuantity: 1, 
+    initialPrice: "",
+    editingOfferId: null 
+  });
 
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -30,6 +40,9 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
 
   const [deleteModal, setDeleteModal] = useState({ open: false, messageId: null });
   const [offerDeleteModal, setOfferDeleteModal] = useState({ open: false, offerId: null });
+
+  const [orderModal, setOrderModal] = useState({ open: false, offer: null });
+  const [orderSuccess, setOrderSuccess] = useState(false);
 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [pendingImageUrl, setPendingImageUrl] = useState(null);
@@ -82,7 +95,6 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploadingImage(true);
     try {
       const res = await chatApi.uploadChatImage(conversationId, file);
@@ -103,90 +115,97 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
   const saveEdit = async (messageId) => {
     if (!editContent.trim()) return;
     setActionBusy(true);
-    try { 
-      await chatApi.editMessage(conversationId, messageId, editContent.trim()); 
-      cancelEdit(); 
-      refresh(); 
-    } catch (err) { 
-      alert("Could not edit message"); 
-    } finally { 
-      setActionBusy(false); 
-    }
+    try { await chatApi.editMessage(conversationId, messageId, editContent.trim()); cancelEdit(); refresh(); } 
+    catch (err) { alert("Could not edit message"); } 
+    finally { setActionBusy(false); }
   };
 
   const openDeleteModal = (messageId) => { setDeleteModal({ open: true, messageId }); };
   const closeDeleteModal = () => { if (actionBusy) return; setDeleteModal({ open: false, messageId: null }); };
   
   const confirmDelete = async () => {
-    const { messageId } = deleteModal; 
-    if (!messageId) return;
+    const { messageId } = deleteModal; if (!messageId) return;
     setActionBusy(true);
-    try { 
-      await chatApi.deleteMessage(conversationId, messageId); 
-      closeDeleteModal(); 
-      refresh(); 
-    } catch (err) { 
-      alert("Could not delete message"); 
-    } finally { 
-      setActionBusy(false); 
-    }
+    try { await chatApi.deleteMessage(conversationId, messageId); closeDeleteModal(); refresh(); } 
+    catch (err) { alert("Could not delete message"); } 
+    finally { setActionBusy(false); }
   };
 
   const latestPending = offers.find((o) => o.status === "PENDING");
   const canRespondToLatest = latestPending && ((isBuyer && latestPending.madeBy === "SELLER") || (!isBuyer && latestPending.madeBy === "BUYER"));
   
-  const openCreateOffer = () => { setModal({ open: true, mode: "create", baseAmount: askingPrice || "", editingOfferId: null }); };
-  const openCounter = () => { setModal({ open: true, mode: "counter", baseAmount: latestPending?.amount || askingPrice || "", editingOfferId: null }); };
+  const openCreateOffer = () => { 
+    setModal({ 
+      open: true, 
+      mode: "create", 
+      baseAmount: askingPrice || "", 
+      initialQuantity: 1,
+      initialPrice: askingPrice || "",
+      editingOfferId: null 
+    }); 
+  };
   
-  const handleOfferSubmit = async (amount, note) => {
+  const openCounter = () => { 
+    if (!latestPending) return;
+    const pricePerItem = (Number(latestPending.amount) / (latestPending.quantity || 1)).toFixed(2);
+    
+    setModal({ 
+      open: true, 
+      mode: "counter", 
+      baseAmount: askingPrice || "", 
+      initialQuantity: latestPending.quantity || 1,
+      initialPrice: pricePerItem,
+      editingOfferId: null 
+    }); 
+  };
+  
+  const handleOfferSubmit = async (amount, note, quantity = 1) => {
     setOfferBusy(true);
     try {
-      if (modal.editingOfferId) await offerApi.update(modal.editingOfferId, amount, note);
-      else if (modal.mode === "counter" && latestPending) await offerApi.counter(latestPending.id, amount, note);
-      else await offerApi.create(conversationId, amount, note);
+      if (modal.editingOfferId) await offerApi.update(modal.editingOfferId, amount, note, quantity);
+      else if (modal.mode === "counter" && latestPending) await offerApi.counter(latestPending.id, amount, note, quantity);
+      else await offerApi.create(conversationId, amount, note, quantity);
       await loadOffers(); 
-      setModal({ open: false, mode: "create", baseAmount: "", editingOfferId: null });
+      setModal({ open: false, mode: "create", baseAmount: "", initialQuantity: 1, initialPrice: "", editingOfferId: null });
     } catch (err) { 
       alert(err.response?.data?.message || "Failed to submit offer"); 
-    } finally { 
-      setOfferBusy(false); 
-    }
+    } finally { setOfferBusy(false); }
   };
   
   const handleAccept = async () => { 
-    if (!latestPending) return; 
-    setOfferBusy(true); 
-    try { 
-      await offerApi.accept(latestPending.id); 
-      await loadOffers(); 
-    } catch (err) { 
-      alert(err.response?.data?.message || "Could not accept"); 
-    } finally { 
-      setOfferBusy(false); 
-    } 
+    if (!latestPending) return; setOfferBusy(true); 
+    try { await offerApi.accept(latestPending.id); await loadOffers(); } 
+    catch (err) { alert(err.response?.data?.message || "Could not accept"); } 
+    finally { setOfferBusy(false); }
   };
   
   const handleReject = async () => { 
-    if (!latestPending) return; 
-    setOfferBusy(true); 
-    try { 
-      await offerApi.reject(latestPending.id); 
-      await loadOffers(); 
-    } catch (err) { 
-      alert(err.response?.data?.message || "Could not reject"); 
-    } finally { 
-      setOfferBusy(false); 
-    } 
+    if (!latestPending) return; setOfferBusy(true); 
+    try { await offerApi.reject(latestPending.id); await loadOffers(); } 
+    catch (err) { alert(err.response?.data?.message || "Could not reject"); } 
+    finally { setOfferBusy(false); }
   };
-  
-  const handlePayOffer = async (offerId) => {
+
+  // --- ORDER LOGIC ---
+  const openOrderModal = (offer) => {
+    setOrderModal({ open: true, offer });
+    setOrderSuccess(false);
+  };
+
+  const confirmOrder = async () => {
+    if (!orderModal.offer) return;
     setOfferBusy(true);
     try {
-      await offerApi.pay(offerId);
-      alert("Payment successful! Order created. Check 'My Orders'.");
-      await loadOffers();
+      await offerApi.pay(orderModal.offer.id, orderModal.offer.quantity || 1); 
+      setOrderSuccess(true);
+      
+      setTimeout(async () => {
+        setOrderModal({ open: false, offer: null });
+        await loadOffers();
+      }, 2000);
+      
     } catch (err) {
-      alert(err.response?.data?.message || "Payment failed");
+      alert(err.response?.data?.message || "Failed to place order");
     } finally {
       setOfferBusy(false);
     }
@@ -196,18 +215,11 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
   const closeOfferDeleteModal = () => { if (actionBusy) return; setOfferDeleteModal({ open: false, offerId: null }); };
   
   const confirmOfferDelete = async () => {
-    const { offerId } = offerDeleteModal; 
-    if (!offerId) return;
+    const { offerId } = offerDeleteModal; if (!offerId) return;
     setActionBusy(true);
-    try { 
-      await offerApi.delete(offerId); 
-      closeOfferDeleteModal(); 
-      loadOffers(); 
-    } catch (err) { 
-      alert(err.response?.data?.message || "Could not delete offer"); 
-    } finally { 
-      setActionBusy(false); 
-    }
+    try { await offerApi.delete(offerId); closeOfferDeleteModal(); loadOffers(); } 
+    catch (err) { alert(err.response?.data?.message || "Could not delete offer"); } 
+    finally { setActionBusy(false); }
   };
 
   const timeline = [
@@ -289,12 +301,7 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
                       <div>
                         {textPart && <p className="whitespace-pre-wrap break-words mb-2">{textPart}</p>}
                         {imageUrl && (
-                          <img 
-                            src={imageUrl} 
-                            alt="Chat attachment" 
-                            className="max-w-[200px] sm:max-w-[250px] rounded-lg cursor-pointer"
-                            onClick={() => window.open(imageUrl, "_blank")}
-                          />
+                          <img src={imageUrl} alt="Chat attachment" className="max-w-[200px] sm:max-w-[250px] rounded-lg cursor-pointer" onClick={() => window.open(imageUrl, "_blank")} />
                         )}
                       </div>
                     )}
@@ -317,14 +324,15 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
                 key={`o-${o.id}`} 
                 offer={o} 
                 isMine={isMineOffer} 
+                role={role} // <-- PASSED ROLE HERE
                 canRespond={canRespondToLatest && o.id === latestPending.id}
                 onAccept={handleAccept} 
                 onReject={handleReject} 
                 onCounter={openCounter} 
                 busy={offerBusy}
-                onEdit={(offerToEdit) => setModal({ open: true, mode: "create", baseAmount: offerToEdit.amount, editingOfferId: offerToEdit.id })}
+                onEdit={(offerToEdit) => setModal({ open: true, mode: "create", baseAmount: offerToEdit.amount, initialQuantity: offerToEdit.quantity, initialPrice: offerToEdit.amount / (offerToEdit.quantity || 1), editingOfferId: offerToEdit.id })}
                 onDelete={(offerToDelete) => openOfferDeleteModal(offerToDelete.id)}
-                onPay={handlePayOffer}
+                onPay={openOrderModal} 
               />
             );
           })
@@ -335,23 +343,16 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
         <div className="px-3 pt-3 bg-white flex items-center gap-3">
           <div className="relative inline-block">
             <img src={`${API_ROOT}${pendingImageUrl}`} alt="Preview" className="h-16 w-16 object-cover rounded-lg border border-gray-200" />
-            <button 
-              onClick={clearPendingImage}
-              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-md"
-            >
-              ✕
-            </button>
+            <button onClick={clearPendingImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-md">✕</button>
           </div>
           <span className="text-xs text-gray-500">Image attached. Type a caption or press Send.</span>
         </div>
       )}
 
       <form onSubmit={handleSendMessage} className="border-t border-gray-200 px-3 py-2 flex gap-2 bg-white items-center">
-        
         {isBuyer && (
           <button type="button" onClick={openCreateOffer} title="Make an offer"
-            className="shrink-0 bg-yellow-50 text-yellow-600 hover:bg-yellow-100 border border-yellow-200 font-bold px-3 py-2 rounded-lg transition text-sm flex items-center gap-1"
-          >
+            className="shrink-0 bg-yellow-50 text-yellow-600 hover:bg-yellow-100 border border-yellow-200 font-bold px-3 py-2 rounded-lg transition text-sm flex items-center gap-1">
             <span>🏷️</span> Offer
           </button>
         )}
@@ -359,8 +360,7 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
         <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
 
         <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage} title="Send a photo"
-          className="shrink-0 text-gray-500 hover:text-maroon-700 transition p-2 disabled:opacity-50"
-        >
+          className="shrink-0 text-gray-500 hover:text-maroon-700 transition p-2 disabled:opacity-50">
           {uploadingImage ? (
             <div className="w-5 h-5 border-2 border-gray-300 border-t-maroon-700 rounded-full animate-spin" />
           ) : (
@@ -372,16 +372,93 @@ export default function ChatWindow({ conversationId, peer, product, onRead, role
         </button>
 
         <input type="text" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Type a message…"
-          disabled={sending} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
-        />
+          disabled={sending} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500" />
         <button type="submit" disabled={sending || (!draft.trim() && !pendingImageUrl)} className="bg-maroon-700 hover:bg-maroon-800 disabled:opacity-50 text-white font-semibold px-4 rounded-lg transition">
           Send
         </button>
       </form>
 
-      <OfferModal open={modal.open} mode={modal.mode} product={safeProduct} baseAmount={modal.baseAmount} onClose={() => setModal({ open: false, mode: "create", baseAmount: "", editingOfferId: null })} onSubmit={handleOfferSubmit} />
+      <OfferModal 
+        open={modal.open} 
+        mode={modal.mode} 
+        product={safeProduct} 
+        baseAmount={modal.baseAmount} 
+        initialQuantity={modal.initialQuantity}
+        initialPrice={modal.initialPrice}
+        onClose={() => setModal({ open: false, mode: "create", baseAmount: "", initialQuantity: 1, initialPrice: "", editingOfferId: null })} 
+        onSubmit={handleOfferSubmit} 
+      />
+      
       <ConfirmModal open={deleteModal.open} title="Delete message?" message="This message will be permanently removed." confirmLabel={actionBusy ? "Deleting..." : "Yes, delete"} cancelLabel="Cancel" tone="danger" onConfirm={confirmDelete} onCancel={closeDeleteModal} busy={actionBusy} />
       <ConfirmModal open={offerDeleteModal.open} title="Delete Offer?" message="This offer will be permanently removed." confirmLabel={actionBusy ? "Deleting..." : "Yes, delete"} cancelLabel="Cancel" tone="danger" onConfirm={confirmOfferDelete} onCancel={closeOfferDeleteModal} busy={actionBusy} />
+
+      {/* CUSTOM ORDER MODAL */}
+      {orderModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            
+            <div className="bg-maroon-900 text-white px-6 py-5 relative">
+              <h2 className="font-bold text-xl">Place Order</h2>
+              <p className="text-maroon-200 text-sm mt-1 uppercase">
+                {orderModal.offer?.productName}
+              </p>
+              <button 
+                onClick={() => setOrderModal({ open: false, offer: null })}
+                disabled={offerBusy || orderSuccess}
+                className="absolute top-5 right-5 text-white/70 hover:text-white transition disabled:opacity-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6">
+              {orderSuccess ? (
+                <div className="text-center py-6">
+                  <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Order Placed!</h3>
+                  <p className="text-gray-500">Check "My Orders" to track your purchase.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Quantity</label>
+                    <div className="text-xl font-bold text-gray-900">
+                      {orderModal.offer?.quantity || 1}
+                    </div>
+                  </div>
+
+                  <p className="text-gray-600 pt-2">
+                    Total: <strong className="text-maroon-800 text-lg">
+                      {formatNaira(orderModal.offer?.amount || 0)}
+                    </strong>
+                  </p>
+
+                  <button
+                    onClick={confirmOrder}
+                    disabled={offerBusy}
+                    className="w-full mt-6 bg-maroon-800 hover:bg-maroon-900 text-white font-bold py-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+                  >
+                    {offerBusy ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Placing Order...
+                      </span>
+                    ) : (
+                      "Confirm Order"
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

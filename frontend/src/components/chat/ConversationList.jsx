@@ -1,79 +1,62 @@
-const API_ROOT = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api"
-).replace(/\/api$/, "");
+import { formatRelativeTime } from "../../utils/formatters";
 
-const PLACEHOLDER_IMG =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3C/svg%3E";
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api").replace(/\/api$/, "");
 
 export default function ConversationList({ conversations, activeId, onSelect }) {
-  if (!conversations.length) {
+  if (!conversations || conversations.length === 0) {
     return (
       <div className="text-center py-10 px-4 text-sm text-gray-500">
-        No conversations yet.
+        No conversations found.
       </div>
     );
   }
 
   return (
-    <ul className="divide-y divide-gray-100">
+    <div className="flex flex-col">
       {conversations.map((c) => {
         const isActive = c.id === activeId;
-        const initial =
-          c.peerFirstName?.[0]?.toUpperCase() ||
-          c.peerUsername?.[0]?.toUpperCase() ||
-          "?";
-        const imgSrc = c.productImageUrl
-          ? `${API_ROOT}${c.productImageUrl}`
-          : PLACEHOLDER_IMG;
-
+        
         return (
-          <li key={c.id}>
-            <button
-              onClick={() => onSelect(c.id)}
-              className={`w-full text-left px-3 py-3 flex gap-3 items-start transition ${
-                isActive ? "bg-maroon-50" : "hover:bg-gray-50"
-              }`}
-            >
-              <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
-                  <img
-                    src={imgSrc}
-                    alt={c.productName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
+          <button
+            key={c.id}
+            onClick={() => onSelect(c.id)}
+            className={`flex items-start gap-3 p-3 text-left border-b border-gray-100 transition ${
+              isActive ? "bg-maroon-50 border-l-4 border-l-maroon-700" : "hover:bg-gray-50 border-l-4 border-l-transparent"
+            }`}
+          >
+            {/* Avatar */}
+            <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold shrink-0 overflow-hidden">
+              {c.productImageUrl ? (
+                <img src={`${API_ROOT}${c.productImageUrl}`} alt={c.productName} className="w-full h-full object-cover" />
+              ) : (
+                c.peerFirstName?.[0]?.toUpperCase() || c.peerUsername?.[0]?.toUpperCase() || "?"
+              )}
+            </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-sm text-gray-900 truncate">
-                    {c.peerFirstName} {c.peerLastName}
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-baseline mb-0.5">
+                <span className="font-semibold text-gray-900 truncate">
+                  {c.peerFirstName ? `${c.peerFirstName} ${c.peerLastName || ""}` : c.peerUsername}
+                </span>
+                {c.lastMessageAt && (
+                  <span className="text-[10px] text-gray-400 shrink-0 ml-2">
+                    {formatRelativeTime(c.lastMessageAt)}
                   </span>
-                  {c.unreadCount > 0 && (
-                    <span className="shrink-0 bg-maroon-700 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-                      {c.unreadCount}
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-xs text-gray-500 truncate mb-0.5">
-                  {c.productName}
-                </p>
-
-                <p
-                  className={`text-xs truncate ${
-                    c.unreadCount > 0
-                      ? "text-gray-900 font-medium"
-                      : "text-gray-500"
-                  }`}
-                >
-                  {c.lastMessagePreview || "No messages yet"}
-                </p>
+                )}
               </div>
-            </button>
-          </li>
+              
+              <div className="text-xs text-gray-500 truncate mb-1">
+                {c.productName}
+              </div>
+              
+              <div className="text-xs text-gray-400 truncate">
+                {c.lastMessage || "No messages yet"}
+              </div>
+            </div>
+          </button>
         );
       })}
-    </ul>
+    </div>
   );
 }

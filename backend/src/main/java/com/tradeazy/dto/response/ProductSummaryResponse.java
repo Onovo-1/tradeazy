@@ -7,16 +7,12 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-/**
- * Compact product view for list pages (search results, home page, seller's list).
- */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class ProductSummaryResponse {
-
     private Long id;
     private String name;
     private BigDecimal price;
@@ -25,16 +21,13 @@ public class ProductSummaryResponse {
     private ProductCondition condition;
     private ProductStatus status;
     private String location;
-    
-    // ADDED: Quantity so the seller dashboard can display stock
     private Integer quantity;
-
+    private Integer soldCount; // ADDED
     private String primaryImageUrl;
+    private Long categoryId;
     private String categoryName;
     private String categorySlug;
-
     private Long sellerId;
     private String sellerUsername;
-
     private OffsetDateTime createdAt;
 }
