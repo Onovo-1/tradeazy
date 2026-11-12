@@ -1,11 +1,9 @@
 spring:
-  datasource:
-    url: ${MYSQL_URL}
-    username: ${MYSQLUSER}
-    password: ${MYSQLPASSWORD}
+  application:
+    name: tradeazy-backend
 
   datasource:
-    # Updated: Uses DB_URL env var for production, falls back to localhost for dev
+    # Uses DB_URL env var for production (Railway), falls back to localhost for dev
     url: ${DB_URL:jdbc:mysql://localhost:3306/tradeazy_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Africa/Lagos&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:tradeazy_user}
     password: ${DB_PASSWORD:TradeazyDev@123}
@@ -25,7 +23,7 @@ spring:
       max-request-size: 50MB
 
 server:
-  # Updated: Uses PORT env var for Render, falls back to 8080 for dev
+  # Uses PORT env var for Railway, falls back to 8080 for dev
   port: ${PORT:8080}
 
 jwt:
@@ -36,7 +34,6 @@ tradeazy:
   upload:
     dir: ${UPLOAD_DIR:./uploads}
   cors:
-    # You will need to add your Render frontend URL here later (e.g., https://tradeazy-frontend.onrender.com)
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://192.168.0.196:5173}
   seed:
     admin:
