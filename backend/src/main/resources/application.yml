@@ -1,6 +1,8 @@
 spring:
-  application:
-    name: tradeazy-backend
+  datasource:
+    url: ${MYSQL_URL}
+    username: ${MYSQLUSER}
+    password: ${MYSQLPASSWORD}
 
   datasource:
     # Updated: Uses DB_URL env var for production, falls back to localhost for dev
