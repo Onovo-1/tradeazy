@@ -27,4 +27,4 @@ frontend/.vite/
 
 # IDE
 .idea/
-*.iml
+*.iml.jdk/
