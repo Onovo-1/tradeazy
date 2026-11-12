@@ -8,10 +8,11 @@ WORKDIR /app
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 
-# Download dependencies with a specific local repo to avoid memory issues
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -B -Dmaven.repo.local=/tmp/.m2
+# Force Maven to use a tiny amount of memory and single thread
+ENV MAVEN_OPTS="-Xmx512m -XX:MaxMetaspaceSize=256m"
+RUN chmod +x mvnw && ./mvnw dependency:go-offline -B -Dmaven.repo.local=/tmp/.m2 -Dorg.slf4j.simpleLogger.showDateTime=true
 
-# Copy the actual source code and build the jar
+# Copy the source and build
 COPY src ./src
 RUN ./mvnw package -DskipTests -Dmaven.repo.local=/tmp/.m2
 
@@ -20,12 +21,6 @@ RUN ./mvnw package -DskipTests -Dmaven.repo.local=/tmp/.m2
 # ==========================================
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-
-# Copy only the built jar from the first stage
 COPY --from=build /app/target/*.jar app.jar
-
-# Expose port 8080
 EXPOSE 8080
-
-# Run the jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
