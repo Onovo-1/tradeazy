@@ -3,9 +3,10 @@ spring:
     name: tradeazy-backend
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/tradeazy_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Africa/Lagos&allowPublicKeyRetrieval=true}
-    username: ${SPRING_DATASOURCE_USERNAME:tradeazy_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:TradeazyDev@123}
+    # Use Railway's exact variable names
+    url: jdbc:mysql://${MYSQLHOST}:${MYSQLPORT}/${MYSQLDATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${MYSQLUSER}
+    password: ${MYSQLPASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -31,7 +32,7 @@ tradeazy:
   upload:
     dir: ${UPLOAD_DIR:./uploads}
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+    allowed-origins: ${CORS_ORIGINS:*}
   seed:
     admin:
       username: ${ADMIN_USERNAME:superadmin}
