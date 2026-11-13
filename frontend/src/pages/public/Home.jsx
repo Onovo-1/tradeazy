@@ -21,7 +21,6 @@ export default function Home() {
       try {
         setLoading(true);
         
-        // Fetch products sorted by most popular (view count)
         const [productsRes, categoriesRes, favoritesRes] = await Promise.all([
           productApi.list({ page: 0, size: 100, sort: "popular" }),
           categoryApi.list(),
@@ -30,7 +29,15 @@ export default function Home() {
         
         if (!cancelled) {
           let fetchedProducts = productsRes.content || [];
-          setCategories(categoriesRes || []);
+          
+          // FIXED: Handle both array and paginated object responses for categories
+          let fetchedCategories = [];
+          if (Array.isArray(categoriesRes)) {
+            fetchedCategories = categoriesRes;
+          } else if (categoriesRes && Array.isArray(categoriesRes.content)) {
+            fetchedCategories = categoriesRes.content;
+          }
+          setCategories(fetchedCategories || []);
           
           const favIds = (favoritesRes.content || []).map(f => f.productId || f.id);
           setSavedProductIds(favIds);
@@ -124,7 +131,8 @@ export default function Home() {
           >
             All
           </Link>
-          {categories.map((cat) => (
+          {/* FIXED: Added Array.isArray safety check */}
+          {Array.isArray(categories) && categories.map((cat) => (
             <div key={cat.id} className="relative group">
               <Link
                 to={`/browse?category=${cat.slug}`}

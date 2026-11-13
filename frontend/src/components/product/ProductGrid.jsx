@@ -21,7 +21,8 @@ export default function ProductGrid({ products, loading, emptyMessage, savedProd
     );
   }
 
-  if (!products || products.length === 0) {
+  // FIXED: Added Array.isArray check
+  if (!products || !Array.isArray(products) || products.length === 0) {
     return (
       <div className="text-center py-16 text-gray-500">
         <p className="text-lg">{emptyMessage || "No products found."}</p>
