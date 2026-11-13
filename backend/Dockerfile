@@ -26,6 +26,7 @@ COPY --from=build /app/target/*.jar app.jar
 # Photos that existed before going live. On startup, any that are missing from
 # the uploads folder (a Railway volume mounted at /app/uploads) are copied in.
 # Existing files are never overwritten.
+COPY --from=build /app/target/*.jar app.jar
 COPY seed-uploads ./seed-uploads
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "mkdir -p uploads && cp -rn seed-uploads/. uploads/ 2>/dev/null; exec java -jar app.jar"]
