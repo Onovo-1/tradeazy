@@ -1,5 +1,6 @@
 package com.tradeazy.controller;
 
+import com.tradeazy.service.AuthService;
 import com.tradeazy.dto.request.LoginRequest;
 import com.tradeazy.dto.request.RegisterRequest;
 import com.tradeazy.dto.response.AuthResponse;
