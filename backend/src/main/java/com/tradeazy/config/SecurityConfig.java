@@ -24,6 +24,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -74,7 +75,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+        
+        // FIXED: Use AllowedOriginPatterns to support "*" with credentials
+        List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        if (origins.contains("*")) {
+            config.setAllowedOriginPatterns(List.of("*"));
+        } else {
+            config.setAllowedOrigins(origins);
+        }
+        
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setExposedHeaders(List.of("Authorization"));
@@ -93,32 +102,19 @@ public class SecurityConfig {
             .exceptionHandling(eh -> eh.authenticationEntryPoint(authenticationEntryPoint))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                // Public prices endpoint FIRST — must beat the seller-only rule
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions/prices").permitAll()
-
-                // Seller dashboard
                 .requestMatchers("/api/products/mine").hasRole("SELLER")
                 .requestMatchers("/api/products/mine/**").hasRole("SELLER")
-
-                // Public product reads
                 .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/category/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/*/images").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/*").permitAll()
-
-                // Public misc
                 .requestMatchers(PUBLIC_URLS).permitAll()
-
-                // Admin
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                // Seller-only writes
                 .requestMatchers(HttpMethod.POST,   "/api/products/**").hasRole("SELLER")
                 .requestMatchers(HttpMethod.PUT,    "/api/products/**").hasRole("SELLER")
                 .requestMatchers(HttpMethod.PATCH,  "/api/products/**").hasRole("SELLER")
                 .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("SELLER")
-
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
