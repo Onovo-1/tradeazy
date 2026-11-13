@@ -31,7 +31,18 @@ export default function ProductDetails() {
       try {
         setLoading(true);
         const data = await productApi.getById(id);
-        if (!cancelled) setProduct(data);
+        
+        if (!cancelled) {
+          setProduct(data);
+
+          // --- RECENTLY VISITED TRACKING ---
+          const categoryId = data.category?.id || data.categoryId;
+          if (categoryId) {
+            const recent = JSON.parse(localStorage.getItem("tradeazy_recent_categories") || "[]");
+            const updated = [categoryId, ...recent.filter(c => c !== categoryId)];
+            localStorage.setItem("tradeazy_recent_categories", JSON.stringify(updated.slice(0, 5)));
+          }
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err.response?.status === 404 ? "Product not found." : "Failed to load product.");
@@ -106,16 +117,12 @@ export default function ProductDetails() {
     try {
       const conversation = await chatApi.startConversation(product.id);
       
-      // Try to send the buy offer
       try {
         await offerApi.buyNow(conversation.id);
       } catch (offerErr) {
-        // SILENT FAIL: Whether it's "already pending" or another error, 
-        // the conversation exists, so just go there.
         console.log("Offer creation skipped/failed, redirecting to chat anyway.");
       }
       
-      // Close modal and navigate to chat
       setBuyModalOpen(false);
       navigate(`/messages?c=${conversation.id}`);
       
@@ -146,7 +153,21 @@ export default function ProductDetails() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <ImageGallery images={product.images} alt={product.name} />
+          
+          {/* IMAGE GALLERY WITH CORNER WATERMARK */}
+          <div className="relative">
+            <ImageGallery images={product.images} alt={product.name} />
+            
+            {product.seller && (
+              <div className="absolute bottom-4 right-4 pointer-events-none select-none z-10">
+                <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-lg border border-white/20 shadow-lg">
+                  <p className="text-lg md:text-xl font-black text-white/90 tracking-widest uppercase">
+                    @{product.seller.username}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div>
             {isSold && <div className="mb-4 inline-block bg-gray-800 text-white text-sm font-bold px-3 py-1 rounded">SOLD</div>}

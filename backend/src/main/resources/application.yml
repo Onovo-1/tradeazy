@@ -3,9 +3,9 @@ spring:
     name: tradeazy-backend
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/tradeazy_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Africa/Lagos&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:tradeazy_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:TradeazyDev@123}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatNaira } from "../../utils/formatters";
-import { subscriptionApi } from "../../api/subscriptionApi"; // <-- We need to create this
+import { subscriptionApi } from "../../api/subscriptionApi";
 import { useAuth } from "../../context/AuthContext";
 
 export default function Rent() {
@@ -27,7 +27,6 @@ export default function Rent() {
     { name: "YEARLY", displayName: "Yearly", price: 50000, days: "365", badge: "BEST VALUE" },
   ];
 
-  // 1. Load real data from backend
   const loadSubscription = useCallback(async () => {
     try {
       setLoading(true);
@@ -49,7 +48,6 @@ export default function Rent() {
     loadSubscription();
   }, [loadSubscription]);
 
-  // 2. Format helpers
   const formatDate = (isoString) => {
     if (!isoString) return "—";
     const d = new Date(isoString);
@@ -75,12 +73,12 @@ export default function Rent() {
     setExpiry(value);
   };
 
+  // FIXED: Limit CVV to exactly 3 digits
   const handleCvvChange = (e) => {
     let value = e.target.value.replace(/\D/g, "");
-    setCvv(value.slice(0, 4));
+    setCvv(value.slice(0, 3));
   };
 
-  // 3. Pay handler - Talks to Backend
   const handlePayClick = (plan) => {
     if (activeSubscription) {
       alert("You already have an active subscription.");
@@ -104,7 +102,6 @@ export default function Rent() {
       await subscriptionApi.renew(selectedPlan.name);
       setPaymentSuccess(true);
       
-      // Reload data from backend to reflect the real new status
       await loadSubscription();
       
       setTimeout(() => {
@@ -117,9 +114,8 @@ export default function Rent() {
     }
   };
 
-  // 4. Validation
   const isCardComplete = cardNumber.replace(/\s/g, "").length === 16;
-  const isCvvComplete = cvv.length >= 3;
+  const isCvvComplete = cvv.length === 3; // FIXED: Validate exactly 3 digits
   
   let isExpiryValid = false;
   let expiryErrorMsg = "";
@@ -153,7 +149,6 @@ export default function Rent() {
         <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
 
-      {/* Current Subscription Banner */}
       <div className={`border rounded-xl p-5 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center ${
         activeSubscription 
           ? "bg-green-50 border-green-200" 
@@ -186,7 +181,6 @@ export default function Rent() {
         )}
       </div>
 
-      {/* Plans Grid */}
       <h2 className="text-lg font-bold text-gray-900 mb-4">Choose a plan</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
         {plans.map((plan) => (
@@ -211,7 +205,6 @@ export default function Rent() {
         ))}
       </div>
 
-      {/* Payment History Table */}
       <h2 className="text-lg font-bold text-gray-900 mb-4">Payment history</h2>
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-left text-sm">
@@ -252,7 +245,6 @@ export default function Rent() {
         </table>
       </div>
 
-      {/* Payment Modal */}
       {modalOpen && selectedPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -320,7 +312,7 @@ export default function Rent() {
                         value={cvv}
                         onChange={handleCvvChange}
                         placeholder="123"
-                        maxLength="4"
+                        maxLength="3"
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-maroon-500 placeholder-gray-400"
                       />
                     </div>

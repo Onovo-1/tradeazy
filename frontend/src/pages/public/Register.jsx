@@ -20,6 +20,9 @@ export default function Register() {
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  
+  // State to track if the user has left the email field
+  const [emailTouched, setEmailTouched] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -34,20 +37,9 @@ export default function Register() {
       let rawValue = value.replace(/\D/g, ""); 
       if (rawValue.length > 11) rawValue = rawValue.slice(0, 11);
 
-      // Strict Rules for Nigerian Numbers:
-      // 1st digit: 0
-      // 2nd digit: 7, 8, 9
-      // 3rd digit: 0, 1
-      
-      if (rawValue.length >= 1 && rawValue[0] !== "0") {
-        return; // Stop if first isn't 0
-      }
-      if (rawValue.length >= 2 && !["7", "8", "9"].includes(rawValue[1])) {
-        return; // Stop if second isn't 7, 8, or 9
-      }
-      if (rawValue.length >= 3 && !["0", "1"].includes(rawValue[2])) {
-        return; // Stop if third isn't 0 or 1
-      }
+      if (rawValue.length >= 1 && rawValue[0] !== "0") return;
+      if (rawValue.length >= 2 && !["7", "8", "9"].includes(rawValue[1])) return;
+      if (rawValue.length >= 3 && !["0", "1"].includes(rawValue[2])) return;
 
       setForm((f) => ({ ...f, phone: rawValue }));
       return;
@@ -64,6 +56,7 @@ export default function Register() {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
+    setEmailTouched(true); // Force email validation on submit
     
     if (!isValidEmail(form.email)) {
       setError("Please enter a valid email address.");
@@ -75,12 +68,30 @@ export default function Register() {
       return;
     }
 
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+    if (!/[A-Z]/.test(form.password)) {
+      setError("Password must contain at least one uppercase letter.");
+      return;
+    }
+    if (!/[a-z]/.test(form.password)) {
+      setError("Password must contain at least one lowercase letter.");
+      return;
+    }
+    if (!/[0-9]/.test(form.password)) {
+      setError("Password must contain at least one number.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      // Temporarily prefix +234 for the backend validation if it still expects it
-      // Remove this if you updated the backend to accept 11-digit numbers
       const payload = { ...form, phone: `+234${form.phone.substring(1)}` };
-      
       await register(payload);
       navigate("/", { replace: true });
     } catch (err) {
@@ -100,6 +111,9 @@ export default function Register() {
     `w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-transparent ${
       fieldErrors[field] ? "border-red-400" : "border-gray-300"
     }`;
+
+  // Show error only if touched AND invalid
+  const showEmailError = emailTouched && form.email && !isValidEmail(form.email);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
@@ -196,13 +210,12 @@ export default function Register() {
               name="email"
               value={form.email}
               onChange={handleChange}
+              onBlur={() => setEmailTouched(true)} // Mark as touched when leaving field
               required
               placeholder="you@example.com"
-              className={`${inputClass("email")} ${
-                form.email && !isValidEmail(form.email) ? "border-red-400" : ""
-              }`}
+              className={`${inputClass("email")} ${showEmailError ? "border-red-400" : ""}`}
             />
-            {form.email && !isValidEmail(form.email) && (
+            {showEmailError && (
               <p className="text-xs text-red-600 mt-1">Invalid email format</p>
             )}
           </div>
@@ -221,7 +234,6 @@ export default function Register() {
               placeholder="e.g. 08012345678"
               className={inputClass("phone")}
             />
-            {/* The error message under the input is completely removed */}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

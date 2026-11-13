@@ -2,7 +2,7 @@ import axios from "axios";
 
 const axiosClient = axios.create({
   // HARDCODED URL - No environment variables needed
-  baseURL: "https://tradeazy-production-06d81663.up.railway.app/api", 
+  baseURL: "http://localhost:8080/api",
   headers: { "Content-Type": "application/json" },
 });
 

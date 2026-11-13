@@ -6,7 +6,7 @@ Sellers pay a monthly "Rent" to list products. Buyers browse, save favorites, ch
 
 ---
 
-## 📋 Status
+## 📊 Status
 
 | Phase | What | Status |
 |-------|------|--------|
@@ -21,23 +21,24 @@ Sellers pay a monthly "Rent" to list products. Buyers browse, save favorites, ch
 | 8 | Offers — structured price negotiation inside chat | ✅ |
 | 9 | Admin Dashboard — stats, user management, product moderation | ✅ |
 | 10 | Polish, Tests, Deployment Prep | ✅ |
+| 11 | Multi-Category Products (e.g. Gaming Laptops) | ✅ |
 
 **13+ unit tests passing.**
 
 ---
 
-## 🏗️ Tech Stack
+## 🛠 Tech Stack
 
 **Backend**
-- Java 21 · Spring Boot 4 · Spring Web · Spring Data JPA · Spring Security
+- Java 21 · Spring Boot 4.1.1 · Spring Web · Spring Data JPA · Spring Security
 - Hibernate ORM · MySQL 8 · Maven
 - JWT (jjwt) · Lombok · SpringDoc OpenAPI / Swagger UI
 
 **Frontend**
-- React 18 · Vite · React Router v6 · Axios · Tailwind CSS
+- React 19 · Vite · React Router v7 · Axios · Tailwind CSS
 
 **Database**
-- MySQL 8 (`tradeazy_db`) — 12 tables
+- MySQL 8 (`tradeazy_db`) — 13 tables (includes `product_categories` join table)
 
 ---
 
