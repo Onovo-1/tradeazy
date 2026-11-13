@@ -33,7 +33,17 @@ public class JwtService {
             @Value("${jwt.expiration-ms}") long expirationMs
     ) {
         // Decode the secret from Base64. It should be at least 256 bits (32 bytes).
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        // Falls back to the raw text if the secret isn't valid Base64, so a plain
+        // passphrase in JWT_SECRET doesn't crash startup.
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(secret);
+        } catch (RuntimeException e) {
+            keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        }
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT_SECRET must be at least 32 bytes long");
+        }
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
         this.expirationMs = expirationMs;
     }
