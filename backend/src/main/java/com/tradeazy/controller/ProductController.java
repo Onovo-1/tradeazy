@@ -49,7 +49,6 @@ public class ProductController {
             @RequestParam(required = false) String location,
             @RequestParam(required = false) ProductCondition condition
     ) {
-        // Resolve the category (slug OR id) to a list of category IDs (parent + children)
         Category cat = null;
         if (category != null && !category.isBlank()) {
             cat = categoryRepository.findBySlug(category).orElse(null);
@@ -57,7 +56,6 @@ public class ProductController {
             cat = categoryRepository.findById(categoryId).orElse(null);
         }
 
-        // Build the list of category IDs (parent + children) — this must be final for use in lambda below
         List<Long> categoryIds;
         if (cat != null) {
             List<Long> ids = new ArrayList<>();
@@ -72,14 +70,13 @@ public class ProductController {
             categoryIds = null;
         }
 
-        // If ANY filter is provided, use the search logic
         if ((q != null && !q.isBlank()) || condition != null || minPrice != null || maxPrice != null || location != null || categoryIds != null) {
             return ResponseEntity.ok(productService.search(
                     q, categoryIds, minPrice, maxPrice, location, condition, page, size, sort
             ));
         }
 
-        // Otherwise, just list active products
+        // FIXED: Removed the userId parameter entirely
         return ResponseEntity.ok(productService.listActive(page, size, sort));
     }
 

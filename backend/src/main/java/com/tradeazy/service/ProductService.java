@@ -128,10 +128,8 @@ public class ProductService {
             throw new InvalidOperationException("Product is already out of stock");
         }
 
-        // Decrement quantity
         product.setQuantity(product.getQuantity() - 1);
 
-        // If we've just sold the last one, mark as SOLD
         if (product.getQuantity() == 0) {
             product.setStatus(ProductStatus.SOLD);
             log.info("Product {} fully sold out (quantity = 0)", productId);
@@ -177,6 +175,7 @@ public class ProductService {
         return ProductMapper.toResponse(product);
     }
 
+    // FIXED: This method is now public and does not require a user ID
     @Transactional(readOnly = true)
     public PagedResponse<ProductSummaryResponse> listActive(int page, int size, String sortBy) {
         Pageable pageable = buildPageable(page, size, sortBy);
