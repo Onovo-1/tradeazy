@@ -1,15 +1,51 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { formatNaira } from "../../utils/formatters";
+import { favoriteApi } from "../../api/favoriteApi";
+import { useAuth } from "../../context/AuthContext";
 
-// A tiny gray placeholder SVG
 const PLACEHOLDER_IMAGE = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect fill='%23f3f4f6' width='400' height='300'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='18' dy='10' font-weight='bold' x='50%25' y='50%25' text-anchor='middle'%3ENo Image%3C/text%3E%3C/svg%3E";
 
-export default function ProductCard({ product, savedProductIds }) {
-  const isSaved = savedProductIds?.includes(product.id);
+export default function ProductCard({ product, savedProductIds = [] }) {
+  const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
+  
+  // Track the state locally so the heart fills in instantly when clicked
+  const [isSaved, setIsSaved] = useState(savedProductIds.includes(product.id));
+  const [busy, setBusy] = useState(false);
+
+  const isOwnProduct = user?.id === product.sellerId;
 
   const imageUrl = product.primaryImageUrl 
-    ? `${import.meta.env.VITE_API_BASE_URL.replace('/api', '')}${product.primaryImageUrl}` 
+    ? `${(import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api").replace('/api', '')}${product.primaryImageUrl}` 
     : PLACEHOLDER_IMAGE;
+
+  const handleToggleFavorite = async (e) => {
+    e.preventDefault(); // Prevent the card from navigating to the product page when the heart is clicked
+    
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    if (isOwnProduct || busy) return;
+
+    setBusy(true);
+    try {
+      if (isSaved) {
+        await favoriteApi.remove(product.id);
+        setIsSaved(false);
+      } else {
+        await favoriteApi.add(product.id);
+        setIsSaved(true);
+      }
+    } catch (err) {
+      // If it fails because it's already saved (409), just set it to true
+      if (err.response?.status === 409) setIsSaved(true);
+      console.error("Failed to toggle favorite", err);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition group relative flex flex-col">
@@ -23,7 +59,7 @@ export default function ProductCard({ product, savedProductIds }) {
             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
             onError={(e) => {
               e.target.onerror = null; 
-              e.target.src = PLACEHOLDER_IMAGE; // Replaces broken image with placeholder
+              e.target.src = PLACEHOLDER_IMAGE;
             }}
           />
         </Link>
@@ -35,12 +71,16 @@ export default function ProductCard({ product, savedProductIds }) {
           </div>
         )}
 
-        {/* Heart Icon */}
-        <div className="absolute top-2 right-2">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-white/80 backdrop-blur-sm ${isSaved ? 'text-red-500' : 'text-gray-400'}`}>
-             {isSaved ? "♥" : "♡"}
-          </div>
-        </div>
+        {/* Clickable Heart Icon */}
+        <button
+          onClick={handleToggleFavorite}
+          disabled={busy || isOwnProduct}
+          className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center bg-white/90 backdrop-blur-sm shadow-sm transition disabled:opacity-50 ${
+            isSaved ? 'text-red-500' : 'text-gray-400 hover:text-red-400'
+          }`}
+        >
+          {isSaved ? "♥" : "♡"}
+        </button>
       </div>
 
       {/* Details */}
